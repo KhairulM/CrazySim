@@ -9,6 +9,8 @@
 [submodule "crazyflie-clients-python"]
 	path = crazyflie-clients-python
 	url = https://github.com/bitcraze/crazyflie-clients-python.git
+	branch = master
 [submodule "crazyflie-lib-python"]
 	path = crazyflie-lib-python
 	url = git@github.com:KhairulM/crazyflie-lib-python.git
+	branch = master

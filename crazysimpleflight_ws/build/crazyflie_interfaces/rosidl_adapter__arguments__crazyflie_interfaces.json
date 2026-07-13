@@ -1,0 +1,23 @@
+{
+  "package_name": "crazyflie_interfaces",
+  "non_idl_tuples": [
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/FullState.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/LogDataGeneric.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/Hover.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/LogBlock.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/Position.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/TrajectoryPolynomialPiece.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:msg/VelocityWorld.msg",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/GoTo.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/Land.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/NotifySetpointsStop.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/SetGroupMask.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/StartTrajectory.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/Stop.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/Takeoff.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/UpdateParams.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/UploadTrajectory.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/RemoveLogging.srv",
+    "/home/user/Projects/CrazySim/crazysimpleflight_ws/src/crazyswarm_SimpleFlight/crazyflie_interfaces:srv/AddLogging.srv"
+  ]
+}

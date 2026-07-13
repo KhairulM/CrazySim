@@ -1,0 +1,83 @@
+[0.155s] Invoking command in '/home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim': AMENT_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim -- -j20 -l20
+[0.200s] Built target ament_cmake_python_symlink_crazyflie_sim
+[0.200s] Built target ament_cmake_python_symlink_crazyflie_sim_setup
+[0.336s] running egg_info
+[0.336s] creating crazyflie_sim.egg-info
+[0.337s] writing manifest file 'crazyflie_sim.egg-info/SOURCES.txt'
+[0.338s] writing manifest file 'crazyflie_sim.egg-info/SOURCES.txt'
+[0.338s] running install_scripts
+[0.338s] /home/user/Projects/CrazySim/.venv/lib/python3.10/site-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
+[0.338s]   warnings.warn(
+[0.354s] Built target ament_cmake_python_build_crazyflie_sim_egg
+[0.355s] running egg_info
+[0.357s] writing manifest file 'crazyflie_sim.egg-info/SOURCES.txt'
+[0.378s] Built target ament_cmake_python_build_crazyflie_sim_scripts
+[0.385s] Invoked command in '/home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim' returned '0': AMENT_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/cmake --build /home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim -- -j20 -l20
+[0.386s] Invoking command in '/home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim': AMENT_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_interfaces/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/cmake --install /home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_sim
+[0.393s] -- Install configuration: "Release"
+[0.393s] -- Execute custom install script
+[0.393s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/pythonpath.sh
+[0.396s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/pythonpath.dsv
+[0.400s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim-2.0.0-py3.10.egg-info/PKG-INFO
+[0.404s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim-2.0.0-py3.10.egg-info/SOURCES.txt
+[0.408s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim-2.0.0-py3.10.egg-info/dependency_links.txt
+[0.415s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim-2.0.0-py3.10.egg-info/entry_points.txt
+[0.418s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim-2.0.0-py3.10.egg-info/top_level.txt
+[0.422s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/crazyflie_sim//crazyflie_server
+[0.432s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/__init__.py
+[0.436s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/backend/none.py
+[0.441s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/backend/np.py
+[0.445s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/crazyflie_server.py
+[0.451s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/crazyflie_sil.py
+[0.455s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/sim_data_types.py
+[0.463s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/README.md
+[0.468s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/blender.py
+[0.473s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/README.md
+[0.478s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/abandoned_greenhouse.jpg
+[0.484s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/aerodynamics_workshop.jpg
+[0.489s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/aviation_museum.jpg
+[0.494s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/crosswalk.jpg
+[0.499s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/derelict_overpass.jpg
+[0.504s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/env.jpg
+[0.510s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/lago_disola.jpg
+[0.515s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/lake_pier.jpg
+[0.521s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/machine_shop.jpg
+[0.526s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/museumplein.jpg
+[0.530s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/peppermint_powerplant.jpg
+[0.536s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env/studio_garden.jpg
+[0.541s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/model/cf.mtl
+[0.548s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/model/cf.obj
+[0.553s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/pdf.py
+[0.557s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/record_states.py
+[0.564s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/rviz.py
+[0.569s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/ament_index/resource_index/package_run_dependencies/crazyflie_sim
+[0.573s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/ament_index/resource_index/parent_prefix_path/crazyflie_sim
+[0.577s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/ament_prefix_path.sh
+[0.583s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/ament_prefix_path.dsv
+[0.587s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/path.sh
+[0.593s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/environment/path.dsv
+[0.599s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/local_setup.bash
+[0.604s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/local_setup.sh
+[0.609s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/local_setup.zsh
+[0.614s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/local_setup.dsv
+[0.619s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/package.dsv
+[0.623s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/ament_index/resource_index/packages/crazyflie_sim
+[0.630s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/cmake/crazyflie_simConfig.cmake
+[0.634s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/cmake/crazyflie_simConfig-version.cmake
+[0.639s] -- Symlinking: /home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/share/crazyflie_sim/package.xml
+[0.670s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim'...
+[0.670s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/__init__.py'...
+[0.671s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/backend'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/backend/none.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/backend/np.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/crazyflie_server.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/crazyflie_sil.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/sim_data_types.py'...
+[0.671s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/blender.py'...
+[0.671s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data'...
+[0.671s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/env'...
+[0.671s] Listing '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/data/model'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/pdf.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/record_states.py'...
+[0.671s] Compiling '/home/user/Projects/CrazySim/crazysimpleflight_ws/install/crazyflie_sim/lib/python3.10/site-packages/crazyflie_sim/visualization/rviz.py'...

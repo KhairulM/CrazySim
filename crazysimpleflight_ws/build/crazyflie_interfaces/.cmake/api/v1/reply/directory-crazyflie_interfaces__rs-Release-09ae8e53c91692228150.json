@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "crazyflie_interfaces__rs",
+		"source" : "/home/user/Projects/CrazySim/crazysimpleflight_ws/build/crazyflie_interfaces/crazyflie_interfaces__rs"
+	}
+}
