@@ -77,6 +77,8 @@ class CrazyflieDrone:
 
         self.max_thrust_pwm = drone_config.get('max_thrust_pwm', 65535.0)
         self.rate_sign = np.array(drone_config.get('rate_sign', [1.0, 1.0, 1.0]))
+        self.takeoff_duration = drone_config.get('takeoff_duration', 2.0)
+        self.control_dt = drone_config.get('control_dt', 0.2)
 
         self.cf = Crazyflie(rw_cache=self.cache)
         self.state = StateBuffer()
@@ -119,22 +121,19 @@ class CrazyflieDrone:
             print(f'[{self.name}] Cannot takeoff, not connected to {self.uri}')
             return
 
-        self.mc = MotionCommander(self.cf)
-        print(f'[{self.name}] Taking off to {height} meters...')
-        self.mc.take_off(height)
+        steps = max(1, int(self.takeoff_duration / self.control_dt))
+        for _ in range(steps):
+            self.cf.commander.send_hover_setpoint(0.0, 0.0, 0.0, height)
+            time.sleep(self.control_dt)
 
     def land(self):
         if not self.connected:
             print(f'[{self.name}] Cannot land, not connected to {self.uri}')
             return
 
-        if hasattr(self, 'mc'):
-            print(f'[{self.name}] Landing...')
-            self.mc.land()
-        else:
-            print(f'[{self.name}] MotionCommander not initialized, sending zero-thrust setpoint for landing...')
-            self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
-            time.sleep(1.0)
+        print(f'[{self.name}] Sending zero-thrust setpoint for landing...')
+        self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
+        time.sleep(1.0)
 
     def get_state(self) -> Optional[ic.DroneState]:
         return self.state.snapshot()
@@ -162,11 +161,13 @@ class CrazyflieDrone:
             0.0, self.max_thrust_pwm))
         self.cf.commander.send_setpoint(roll_rate, pitch_rate, yaw_rate, thrust)
 
+    def setup(self):
+        self._setup_params()
+        self._setup_loggers()
+
     def _on_connected(self, link_uri):
         print(f'[{self.name}] Connected to {link_uri}')
         self.connected = True
-        self._setup_params()
-        self._setup_loggers()
 
     def _on_disconnected(self, link_uri):
         print(f'[{self.name}] Disconnected from {link_uri}')
@@ -179,8 +180,8 @@ class CrazyflieDrone:
 
     def _setup_params(self):
         # Set the stabilizer mode to angle mode for roll and pitch
-        self.cf.param.set_value(STAB_MODE_ROLL_PARAM, STAB_MODE_ANGLE)
-        self.cf.param.set_value(STAB_MODE_PITCH_PARAM, STAB_MODE_ANGLE)
+        self.cf.param.set_value(STAB_MODE_ROLL_PARAM, STAB_MODE_RATE)
+        self.cf.param.set_value(STAB_MODE_PITCH_PARAM, STAB_MODE_RATE)
         # Set the stabilizer estimator to Kalman filter
         self.cf.param.set_value(STAB_ESTIMATOR_PARAM, STAB_ESTIMATOR_KALMAN)
 
