@@ -46,8 +46,12 @@ class MocapTfPublisher:
             rclpy.init()
         self._node = rclpy.create_node(node_name)
         self._pub = self._node.create_publisher(TFMessage, 'tf', 10)
+        self._connected = True
 
     def publish(self, child_frame_id: str, pose: ic.MocapPose) -> None:
+        if not self._connected or not rclpy.ok():
+            return
+
         transform = TransformStamped()
         transform.header.stamp = self._node.get_clock().now().to_msg()
         transform.header.frame_id = self._world_frame
@@ -64,6 +68,7 @@ class MocapTfPublisher:
         self._pub.publish(TFMessage(transforms=[transform]))
 
     def close(self) -> None:
+        self._connected = False
         try:
             self._node.destroy_node()
         except Exception:  # pragma: no cover - best-effort teardown
@@ -94,6 +99,7 @@ class MocapReceiver:
         self._last_send_stamp: dict[int, float] = {}
         self._lock = threading.Lock()
         self._client = None
+        self._connected = False
 
     def register(self, rigid_body_id: int, drone: Drone,
                  frame_id: Optional[str] = None) -> None:
@@ -103,6 +109,7 @@ class MocapReceiver:
             self._targets[rb_id] = (drone, frame_id or f'cf_{rb_id}')
 
     def start(self) -> None:
+        self._connected = True
         client = NatNetClient()
         client.serverIPAddress = self._cfg.server_ip
         client.localIPAddress = (
@@ -117,6 +124,8 @@ class MocapReceiver:
 
     def _on_rigid_body(self, rigid_body_id, position, rotation,
                        tracking_valid) -> None:
+        if not self._connected:
+            return
         rb_id = int(rigid_body_id)
         now = time.monotonic()
         with self._lock:
@@ -146,10 +155,12 @@ class MocapReceiver:
 
     def stop(self) -> None:
         """Best-effort teardown of the NatNet sockets (threads are daemons)."""
+        self._connected = False
         client = self._client
         self._client = None
         if client is None:
             return
+        client.rigidBodyListener = None
         for sock_attr in ('dataSocket', 'commandSocket'):
             sock = getattr(client, sock_attr, None)
             if sock is not None:
