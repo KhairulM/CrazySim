@@ -8,7 +8,6 @@ from typing import Optional
 
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
-from cflib.positioning.motion_commander import MotionCommander
 
 import intercept_common as ic
 
@@ -92,7 +91,7 @@ class Drone(ABC):
         pass
 
     @abstractmethod
-    def takeoff(self, height):
+    def takeoff(self, height, duration: float = 3.0):
         pass
 
     @abstractmethod
@@ -120,18 +119,22 @@ class CrazyflieDrone(Drone):
     def __init__(self, drone_config: ic.DroneConfig):
         self.name = drone_config.name
         self.uri = drone_config.uri
-        self.cache = drone_config.cache_dir
         self.drone_config = drone_config
 
         self.max_thrust_pwm = drone_config.max_thrust_pwm
         self.rate_sign = np.array(drone_config.rate_sign)
-        self.takeoff_duration = drone_config.takeoff_duration
         self.control_dt = drone_config.control_dt
         self.log_period_ms = max(10, int(drone_config.log_period_ms))
 
-        self.cf = Crazyflie(rw_cache=self.cache)
+        self.cf = Crazyflie(rw_cache=drone_config.cache_dir)
         self.state = StateBuffer()
         self.connected = False
+
+    def _require_connected(self, action: str) -> bool:
+        """Return ``True`` if connected, otherwise log why ``action`` was skipped."""
+        if not self.connected:
+            print(f'[{self.name}] Cannot {action}, not connected to {self.uri}')
+        return self.connected
 
     def connect(self):
         self.cf.connected.add_callback(self._on_connected)
@@ -143,8 +146,7 @@ class CrazyflieDrone(Drone):
         self.cf.close_link()
 
     def arm(self):
-        if not self.connected:
-            print(f'[{self.name}] Cannot arm, not connected to {self.uri}')
+        if not self._require_connected('arm'):
             return
 
         self.cf.supervisor.send_arming_request(True)
@@ -157,27 +159,24 @@ class CrazyflieDrone(Drone):
         print(f'[{self.name}] Armed. Commander unlocked. Ready to take off.')
 
     def disarm(self):
-        if not self.connected:
-            print(f'[{self.name}] Cannot disarm, not connected to {self.uri}')
+        if not self._require_connected('disarm'):
             return
         self.cf.supervisor.send_arming_request(False)
         time.sleep(1.0)
 
         print(f'[{self.name}] Disarmed. Commander locked. Motors stopped.')
 
-    def takeoff(self, height):
-        if not self.connected:
-            print(f'[{self.name}] Cannot takeoff, not connected to {self.uri}')
+    def takeoff(self, height, duration: float = 3.0):
+        if not self._require_connected('takeoff'):
             return
 
-        steps = max(1, int(self.takeoff_duration / self.control_dt))
+        steps = max(1, int(duration / self.control_dt))
         for _ in range(steps):
             self.cf.commander.send_hover_setpoint(0.0, 0.0, 0.0, height)
             time.sleep(self.control_dt)
 
     def land(self):
-        if not self.connected:
-            print(f'[{self.name}] Cannot land, not connected to {self.uri}')
+        if not self._require_connected('land'):
             return
 
         print(f'[{self.name}] Sending zero-thrust setpoint for landing...')
@@ -228,37 +227,40 @@ class CrazyflieDrone(Drone):
         self.connected = False
 
     def _setup_params(self):
-        # Set the stabilizer mode to angle mode for roll and pitch
+        # Set the stabilizer mode to rate mode for roll and pitch
         self.cf.param.set_value(STAB_MODE_ROLL_PARAM, STAB_MODE_RATE)
         self.cf.param.set_value(STAB_MODE_PITCH_PARAM, STAB_MODE_RATE)
         # Set the stabilizer estimator to Kalman filter
         self.cf.param.set_value(STAB_ESTIMATOR_PARAM, STAB_ESTIMATOR_KALMAN)
 
     def _setup_loggers(self):
-        pos_log = LogConfig(name='pos_vel', period_in_ms=self.log_period_ms)
-        for var in ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
-                    'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'):
-            pos_log.add_variable(var, 'float')
-        pos_log.data_received_cb.add_callback(self._pos_vel_cb)
-
-        att_log = LogConfig(name='attitude', period_in_ms=self.log_period_ms)
-        for var in ('stateEstimate.qw', 'stateEstimate.qx', 'stateEstimate.qy', 'stateEstimate.qz'):
-            att_log.add_variable(var, 'float')
-        att_log.data_received_cb.add_callback(self._att_cb)
-
-        self.cf.log.add_config(pos_log)
-        self.cf.log.add_config(att_log)
-
-        pos_log.start()
-        att_log.start()
-
+        self._start_log(
+            'pos_vel',
+            ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
+             'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'),
+            self._pos_vel_cb,
+        )
+        self._start_log(
+            'attitude',
+            ('stateEstimate.qw', 'stateEstimate.qx',
+             'stateEstimate.qy', 'stateEstimate.qz'),
+            self._att_cb,
+        )
         if self.drone_config.need_rot_speed:
-            gyro_log = LogConfig(name='gyro', period_in_ms=self.log_period_ms)
-            for var in ('gyro.x', 'gyro.y', 'gyro.z'):
-                gyro_log.add_variable(var, 'float')
-            gyro_log.data_received_cb.add_callback(self._gyro_cb)
-            self.cf.log.add_config(gyro_log)
-            gyro_log.start()
+            self._start_log(
+                'gyro',
+                ('gyro.x', 'gyro.y', 'gyro.z'),
+                self._gyro_cb,
+            )
+
+    def _start_log(self, name, variables, callback):
+        log_config = LogConfig(name=name, period_in_ms=self.log_period_ms)
+        for var in variables:
+            log_config.add_variable(var, 'float')
+        log_config.data_received_cb.add_callback(callback)
+        self.cf.log.add_config(log_config)
+        log_config.start()
+        return log_config
 
     def _pos_vel_cb(self, timestamp, data, logconf_name):
         self.state.update_pos_vel(

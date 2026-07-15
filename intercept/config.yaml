@@ -1,0 +1,59 @@
+# Intercept controller configuration.
+#
+# All runtime settings for intercept_controller.py live here (no CLI flags).
+# Run with:  python intercept_controller.py [--config intercept_config.yaml]
+# Any key omitted below falls back to the documented default.
+
+artifact_dir: artifacts/intercept_ppo_crazyflie_v4.4  # Folder with policy_ts.pt + metadata.json (required).
+
+# -- Pursuer drone config ----------------------------------------------------
+pursuer:
+  name: pursuer
+  uri: radio://0/40/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
+  cache_dir: ./cache-pursuer                    # cflib read/write cache directory.
+  control_dt: 0.02                 # 0 = use the policy's training dt.
+  log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
+  max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
+  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+  state_timeout: 0.5                   # Stop if state is stale this long (s).
+  min_altitude: 0.15                   # Safety cutoff altitude (m).
+  need_rot_speed: false                  # Whether to request motor speeds from the pursuer (for logging).
+
+
+# -- Evader drone config -----------------------------------------------------
+evader:
+  name: evader
+  uri: radio://0/40/2M/E7E7E7E702    # Evader Crazyflie URI (when source == cf).
+  cache_dir: ./cache-evader                    # cflib read/write cache directory.
+  control_dt: 0.02                 # 0 = use the policy's training dt.
+  log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
+  max_thrust_pwm: 65535.0              # Upper clamp on commanded thrust (0..65535).
+  rate_sign: [1.0, 1.0, 1.0]           # Per-axis sign flips: [roll, pitch, yaw].
+
+# -- Open-loop takeoff -------------------------------------------------------
+takeoff:
+  enabled: true
+  thrust: 50000                      # Legacy CTBR takeoff PWM (unused; hover setpoints).
+  hover_z: 1.0                       # Absolute hover height target (m).
+  duration: 3.0                      # Takeoff duration (s).
+
+# -- Trajectory logging ------------------------------------------------------
+trajectory:
+  save: true
+  dir: ./trajectory_logs
+  prefix: intercept
+
+# -- Motion capture (OptiTrack / NatNet) -------------------------------------
+mocap:
+  enabled: true
+  server_ip: 192.168.0.210           # Motive/NatNet server IP.
+  local_ip: ""                       # Local NIC IP for multicast ("" = auto-detect).
+  multicast_address: 239.255.42.99           # NatNet multicast group address.
+  command_port: 1510
+  data_port: 1511
+  # Body-frame correction quaternion [qx, qy, qz, qw] mapping Motive -> ROS FLU.
+  body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  
+  mocap_send_rate_hz: 30.0
+  publish_tf: false                  # Also publish poses on the ROS 2 /tf tree.
+  world_frame: world                 # Parent frame id for published TF transforms.

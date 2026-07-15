@@ -23,28 +23,9 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    # Example usage
-    drone_config = ic.DroneConfig(
-        name='pursuer',
-        uri='udp://127.0.0.1:19850',
-        # uri='radio://0/40/2M/E7E7E7E701',
-        cache_dir='./cache',
-        max_thrust_pwm=65535.0,
-        rate_sign=[1.0, 1.0, 1.0],
-        log_period_ms=20,
-        takeoff_duration=2.0,
-        control_dt=0.02,
-        need_rot_speed=False
-    )
+    drone_config = ic.load_drone_config_from_yaml('config.yaml', 'pursuer')
+    mocap_config = ic.load_mocap_config_from_yaml('config.yaml')
 
-    mocap_config = ic.MocapConfig(
-        server_ip='192.168.0.210',
-        local_ip=("" or None),
-        multicast_address='239.255.42.99',
-        command_port=1510,
-        data_port=1511,
-        body_to_flu_quat_xyzw=(0.0, 0.0, -0.7071067811865476, 0.7071067811865476),
-    )
     cflib.crtp.init_drivers()
 
     drone = CrazyflieDrone(drone_config)
@@ -53,19 +34,19 @@ if __name__ == "__main__":
 
     drone.connect()
     time.sleep(2)  # Wait for connection
-    drone.setup()  # Setup parameters and loggers
+    drone.setup()
 
     mocap_receiver.register(rigid_body_id=31, drone=drone)
-    mocap_receiver.start()  # Start receiving mocap data
+    mocap_receiver.start()
 
     drone.arm()
-    drone.takeoff(0.5)  # Take off to 0.5 meter
+    drone.takeoff(0.5)
 
     while drone.connected:
         try:
             time.sleep(drone.control_dt)
             state = drone.get_state()
-            print(f"Drone state after takeoff: {state}")
+            print(f"Drone state: {state}")
 
             # dummy CTBR
             ctbr_command = ic.CTBRCommand(

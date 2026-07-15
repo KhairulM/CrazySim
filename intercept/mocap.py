@@ -1,3 +1,4 @@
+import socket
 import threading
 import time
 from typing import Optional
@@ -18,7 +19,6 @@ def _detect_local_ip_for_server(server_ip: str) -> str:
     resolves the outbound interface. Falls back to ``0.0.0.0`` (bind-any) if the
     route cannot be determined.
     """
-    import socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.connect((server_ip, 1))
@@ -32,15 +32,14 @@ def _detect_local_ip_for_server(server_ip: str) -> str:
 class MocapTfPublisher:
     """Optional ROS 2 TF publisher for mocap poses.
 
-    ``rclpy`` is imported lazily so the controller keeps its pure-``cflib``
-    dependency footprint unless TF publishing is explicitly requested.
+    Only instantiated when TF publishing is requested, so the rest of the
+    controller keeps its pure-``cflib`` dependency footprint. Initialises
+    ``rclpy`` if the caller has not done so already and tears it down on
+    :meth:`close`.
     """
 
     def __init__(self, world_frame: str = 'world',
                  node_name: str = 'intercept_mocap_tf') -> None:
-        self._rclpy = rclpy
-        self._TFMessage = TFMessage
-        self._TransformStamped = TransformStamped
         self._world_frame = world_frame
         self._owns_rclpy = not rclpy.ok()
         if self._owns_rclpy:
@@ -49,7 +48,7 @@ class MocapTfPublisher:
         self._pub = self._node.create_publisher(TFMessage, 'tf', 10)
 
     def publish(self, child_frame_id: str, pose: ic.MocapPose) -> None:
-        transform = self._TransformStamped()
+        transform = TransformStamped()
         transform.header.stamp = self._node.get_clock().now().to_msg()
         transform.header.frame_id = self._world_frame
         transform.child_frame_id = child_frame_id
@@ -62,7 +61,7 @@ class MocapTfPublisher:
         transform.transform.rotation.y = float(qy)
         transform.transform.rotation.z = float(qz)
         transform.transform.rotation.w = float(qw)
-        self._pub.publish(self._TFMessage(transforms=[transform]))
+        self._pub.publish(TFMessage(transforms=[transform]))
 
     def close(self) -> None:
         try:
@@ -71,7 +70,7 @@ class MocapTfPublisher:
             pass
         if self._owns_rclpy:
             try:
-                self._rclpy.shutdown()
+                rclpy.shutdown()
             except Exception:  # pragma: no cover - best-effort teardown
                 pass
 
@@ -98,7 +97,7 @@ class MocapReceiver:
 
     def register(self, rigid_body_id: int, drone: Drone,
                  frame_id: Optional[str] = None) -> None:
-        """Route frames for ``rigid_body_id`` to ``cf`` (and TF ``frame_id``)."""
+        """Route frames for ``rigid_body_id`` to ``drone`` (and TF ``frame_id``)."""
         rb_id = int(rigid_body_id)
         with self._lock:
             self._targets[rb_id] = (drone, frame_id or f'cf_{rb_id}')
@@ -122,30 +121,23 @@ class MocapReceiver:
         now = time.monotonic()
         with self._lock:
             target = self._targets.get(rb_id)
-            min_dt = 0.0
+            if target is None:
+                return
             if self._cfg.mocap_send_rate_hz > 0.0:
                 min_dt = 1.0 / self._cfg.mocap_send_rate_hz
-            if min_dt > 0.0:
                 last_stamp = self._last_send_stamp.get(rb_id, 0.0)
                 if (now - last_stamp) < min_dt:
                     return
                 self._last_send_stamp[rb_id] = now
-        if target is None:
-            return
         drone, frame_id = target
 
         pose = ic.transform_mocap_pose(
-            self._cfg, int(rigid_body_id), position, rotation, tracking_valid)
+            self._cfg, rb_id, position, rotation, tracking_valid)
         if not pose.tracking_valid:
             return
 
         try:
-            drone.send_mocap_pose(ic.MocapPose(
-                rigid_body_id=rb_id,
-                position=pose.position,
-                quat_xyzw=pose.quat_xyzw,
-                tracking_valid=pose.tracking_valid
-            ))
+            drone.send_mocap_pose(pose)
         except Exception:  # pragma: no cover - link may be tearing down
             return
 

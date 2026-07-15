@@ -350,6 +350,14 @@ DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW = (
 )
 
 
+def _read_yaml(path: str) -> dict:
+    """Parse a YAML file into a plain ``dict`` (``yaml`` imported lazily)."""
+    import yaml  # type: ignore[import]
+
+    with open(path, 'r', encoding='utf-8') as handle:
+        return yaml.safe_load(handle)
+
+
 @dataclass
 class MocapConfig:
     """Network + frame-convention settings for a NatNet mocap stream.
@@ -359,15 +367,27 @@ class MocapConfig:
     observation helpers above).
     """
 
+    enabled: bool = True
     server_ip: str = '127.0.0.1'
     # None => auto-detect the local interface that routes to ``server_ip``.
     local_ip: Optional[str] = None
     multicast_address: str = '239.255.42.99'
     command_port: int = 1510
     data_port: int = 1511
+    rigid_body_id: int = 31
     # Maximum forwarding rate for extpose updates to the drone.
     mocap_send_rate_hz: float = 30.0
     body_to_flu_quat_xyzw: tuple = DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW
+    publish_tf: bool = True
+    world_frame: str = 'world'
+
+
+def load_mocap_config_from_yaml(path: str) -> MocapConfig:
+    """Load a :class:`MocapConfig` from the ``mocap`` section of a YAML file.
+
+    Extra keys are ignored; missing optional fields fall back to their defaults.
+    """
+    return MocapConfig(**_read_yaml(path)['mocap'])
 
 
 @dataclass
@@ -456,7 +476,7 @@ def artifact_paths(output_dir: str) -> 'tuple[str, str]':
 
 
 # ---------------------------------------------------------------------------
-# Drone state representation
+# Drone representation
 # ---------------------------------------------------------------------------
 @dataclass
 class DroneConfig:
@@ -465,13 +485,21 @@ class DroneConfig:
     name: str
     uri: str
     cache_dir: Optional[str] = None
+    control_dt: float = 0.02
     max_thrust_pwm: float = 65535.0
     rate_sign: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
     need_rot_speed: bool = False
     log_period_ms: int = 20
+    state_timeout: float = 0.5
+    min_altitude: float = 0.15
 
-    takeoff_duration: float = 2.0
-    control_dt: float = 0.2
+
+def load_drone_config_from_yaml(path: str, drone_name: str) -> DroneConfig:
+    """Load a :class:`DroneConfig` from the ``drone_name`` section of a YAML file.
+
+    Extra keys are ignored; missing optional fields fall back to their defaults.
+    """
+    return DroneConfig(**_read_yaml(path)[drone_name])
 
 
 @dataclass
