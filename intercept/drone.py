@@ -8,6 +8,7 @@ from typing import Optional
 
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
+from cflib.crazyflie.syncLogger import SyncLogger
 
 import intercept_common as ic
 
@@ -114,6 +115,11 @@ class Drone(ABC):
     def send_ctbr(self, command: ic.CTBRCommand):
         pass
 
+    @abstractmethod
+    def send_position_setpoint(self, x: float, y: float, z: float,
+                               yaw_deg: float = 0.0):
+        pass
+
 
 class CrazyflieDrone(Drone):
     def __init__(self, drone_config: ic.DroneConfig):
@@ -141,6 +147,9 @@ class CrazyflieDrone(Drone):
         self.cf.connection_lost.add_callback(self._on_disconnected)
         self.cf.open_link(self.uri)
 
+        while not self.connected:
+            time.sleep(0.1)
+
     def disconnect(self):
         self._on_disconnected(self.uri)
         self.cf.close_link()
@@ -151,6 +160,11 @@ class CrazyflieDrone(Drone):
 
         self.cf.supervisor.send_arming_request(True)
         time.sleep(1.0)
+
+        print(f'[{self.name}] Arming request sent. Waiting for Kalman filter to converge...')
+        if not self._is_estimator_converged():
+            print(f'[{self.name}] Warning: Kalman filter not converged. '
+                  'Position estimate may be inaccurate.')
 
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
@@ -169,6 +183,8 @@ class CrazyflieDrone(Drone):
     def takeoff(self, height, duration: float = 3.0):
         if not self._require_connected('takeoff'):
             return
+
+        print(f'[{self.name}] Taking off to {height:.2f} m over {duration:.1f} s...')
 
         steps = max(1, int(duration / self.control_dt))
         for _ in range(steps):
@@ -208,6 +224,11 @@ class CrazyflieDrone(Drone):
             float(command.thrust_pwm.detach().cpu().item()),
             0.0, self.max_thrust_pwm))
         self.cf.commander.send_setpoint(roll_rate, pitch_rate, yaw_rate, thrust)
+
+    def send_position_setpoint(self, x: float, y: float, z: float,
+                               yaw_deg: float = 0.0):
+        self.cf.commander.send_position_setpoint(
+            float(x), float(y), float(z), float(yaw_deg))
 
     def setup(self):
         self._setup_params()
@@ -286,3 +307,37 @@ class CrazyflieDrone(Drone):
             data['gyro.y'],
             data['gyro.z'],
         )
+
+    def _is_estimator_converged(self, threshold=0.001, timeout=10.0) -> bool:
+        """Wait for the Kalman filter to converge on a position estimate."""
+        log_conf = LogConfig(name='Kalman Variance', period_in_ms=100)
+        log_conf.add_variable('kalman.varPX', 'float')
+        log_conf.add_variable('kalman.varPY', 'float')
+        log_conf.add_variable('kalman.varPZ', 'float')
+        var_hist = {'x': [1000]*10, 'y': [1000]*10, 'z': [1000]*10}
+        deadline = time.time() + timeout
+        with SyncLogger(self.cf, log_conf) as logger:
+            for _, data, _ in logger:
+                px = data['kalman.varPX']
+                py = data['kalman.varPY']
+                pz = data['kalman.varPZ']
+
+                for k, v in zip('xyz', (px, py, pz)):
+                    var_hist[k] = var_hist[k][1:] + [v]
+
+                # Update a single terminal line with latest Kalman variances.
+                print(
+                    f'\r[{self.name}] Kalman var: '
+                    f'px={px:.6f} py={py:.6f} pz={pz:.6f}',
+                    end='',
+                    flush=True,
+                )
+
+                if all(max(h) - min(h) < threshold for h in var_hist.values()):
+                    print()
+                    return True
+                if time.time() > deadline:
+                    print()
+                    return False
+            print()
+            return False
