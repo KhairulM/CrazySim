@@ -1,8 +1,6 @@
 import time
 import warnings
 
-import torch
-
 import cflib.crtp
 
 from drone import CrazyflieDrone
@@ -23,7 +21,7 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    drone_config = ic.load_drone_config_from_yaml('config.yaml', 'pursuer')
+    drone_config = ic.load_drone_config_from_yaml('config.yaml', 'evader')
     mocap_config = ic.load_mocap_config_from_yaml('config.yaml')
 
     cflib.crtp.init_drivers()
@@ -32,33 +30,38 @@ if __name__ == "__main__":
     mocap_tf_publisher = MocapTfPublisher(world_frame="world")
     mocap_receiver = MocapReceiver(mocap_config, tf_publisher=mocap_tf_publisher)
 
-    drone.connect()
-    time.sleep(2)  # Wait for connection
-    drone.setup()
+    try:
+        drone.connect()
+        drone.setup()
 
-    mocap_receiver.register(rigid_body_id=31, drone=drone)
-    mocap_receiver.start()
+        mocap_receiver.register(rigid_body_id=32, drone=drone)
+        mocap_receiver.start()
 
-    drone.arm()
-    drone.takeoff(0.5)
+        drone.arm()
+        drone.takeoff(0.75)
+        position_hold = (0.0, 0.0, 0.75, 0.0)
 
-    while drone.connected:
-        try:
-            time.sleep(drone.control_dt)
-            state = drone.get_state()
-            print(f"Drone state: {state}")
+        while drone.connected:
+            try:
+                state = drone.get_state()
+                print(f"Drone state: {state}")
 
-            # dummy CTBR
-            ctbr_command = ic.CTBRCommand(
-                body_rate_deg=torch.Tensor([0.0, 0.0, 0.0]),
-                thrust_ratio=torch.Tensor([0.5]),
-                thrust_pwm=torch.Tensor([50000])
-            )
+                # dummy CTBR
+                # ctbr_command = ic.CTBRCommand(
+                #     body_rate_deg=torch.Tensor([0.0, 0.0, 0.0]),
+                #     thrust_ratio=torch.Tensor([0.5]),
+                #     thrust_pwm=torch.Tensor([50000])
+                # )
 
-            drone.send_ctbr(ctbr_command)
-        except KeyboardInterrupt:
-            break
+                # drone.send_ctbr(ctbr_command)
 
-    drone.land()
-    drone.disarm()
-    drone.disconnect()
+                drone.send_position_setpoint(*position_hold)
+                time.sleep(drone.control_dt)
+            except KeyboardInterrupt:
+                break
+    finally:
+        mocap_tf_publisher.close()
+        mocap_receiver.stop()
+        drone.land()
+        drone.disarm()
+        drone.disconnect()
