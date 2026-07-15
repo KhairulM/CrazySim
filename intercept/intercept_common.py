@@ -365,6 +365,8 @@ class MocapConfig:
     multicast_address: str = '239.255.42.99'
     command_port: int = 1510
     data_port: int = 1511
+    # Maximum forwarding rate for extpose updates to the drone.
+    mocap_send_rate_hz: float = 30.0
     body_to_flu_quat_xyzw: tuple = DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW
 
 
@@ -456,6 +458,22 @@ def artifact_paths(output_dir: str) -> 'tuple[str, str]':
 # ---------------------------------------------------------------------------
 # Drone state representation
 # ---------------------------------------------------------------------------
+@dataclass
+class DroneConfig:
+    """Configuration for a single drone, used to instantiate a :class:`Drone`."""
+
+    name: str
+    uri: str
+    cache_dir: Optional[str] = None
+    max_thrust_pwm: float = 65535.0
+    rate_sign: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
+    need_rot_speed: bool = False
+    log_period_ms: int = 20
+
+    takeoff_duration: float = 2.0
+    control_dt: float = 0.2
+
+
 @dataclass
 class DroneState:
     """World-frame drone state with an Isaac-style ``(w, x, y, z)`` quaternion."""

@@ -2,6 +2,7 @@ import threading
 import time
 import numpy as np
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 from typing import Optional
 
@@ -68,17 +69,65 @@ class StateBuffer:
             )
 
 
-class CrazyflieDrone:
-    def __init__(self, drone_config):
-        self.name = drone_config['name']
-        self.uri = drone_config['uri']
-        self.cache = drone_config['cache']
+class Drone(ABC):
+
+    @abstractmethod
+    def connect(self):
+        pass
+
+    @abstractmethod
+    def setup(self):
+        pass
+
+    @abstractmethod
+    def disconnect(self):
+        pass
+
+    @abstractmethod
+    def arm(self):
+        pass
+
+    @abstractmethod
+    def disarm(self):
+        pass
+
+    @abstractmethod
+    def takeoff(self, height):
+        pass
+
+    @abstractmethod
+    def land(self):
+        pass
+
+    @abstractmethod
+    def get_state(self) -> Optional[ic.DroneState]:
+        pass
+
+    @abstractmethod
+    def set_param(self, group, name, value):
+        pass
+
+    @abstractmethod
+    def send_mocap_pose(self, pose: ic.MocapPose):
+        pass
+
+    @abstractmethod
+    def send_ctbr(self, command: ic.CTBRCommand):
+        pass
+
+
+class CrazyflieDrone(Drone):
+    def __init__(self, drone_config: ic.DroneConfig):
+        self.name = drone_config.name
+        self.uri = drone_config.uri
+        self.cache = drone_config.cache_dir
         self.drone_config = drone_config
 
-        self.max_thrust_pwm = drone_config.get('max_thrust_pwm', 65535.0)
-        self.rate_sign = np.array(drone_config.get('rate_sign', [1.0, 1.0, 1.0]))
-        self.takeoff_duration = drone_config.get('takeoff_duration', 2.0)
-        self.control_dt = drone_config.get('control_dt', 0.2)
+        self.max_thrust_pwm = drone_config.max_thrust_pwm
+        self.rate_sign = np.array(drone_config.rate_sign)
+        self.takeoff_duration = drone_config.takeoff_duration
+        self.control_dt = drone_config.control_dt
+        self.log_period_ms = max(10, int(drone_config.log_period_ms))
 
         self.cf = Crazyflie(rw_cache=self.cache)
         self.state = StateBuffer()
@@ -186,13 +235,13 @@ class CrazyflieDrone:
         self.cf.param.set_value(STAB_ESTIMATOR_PARAM, STAB_ESTIMATOR_KALMAN)
 
     def _setup_loggers(self):
-        pos_log = LogConfig(name='pos_vel', period_in_ms=10)
+        pos_log = LogConfig(name='pos_vel', period_in_ms=self.log_period_ms)
         for var in ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
                     'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'):
             pos_log.add_variable(var, 'float')
         pos_log.data_received_cb.add_callback(self._pos_vel_cb)
 
-        att_log = LogConfig(name='attitude', period_in_ms=10)
+        att_log = LogConfig(name='attitude', period_in_ms=self.log_period_ms)
         for var in ('stateEstimate.qw', 'stateEstimate.qx', 'stateEstimate.qy', 'stateEstimate.qz'):
             att_log.add_variable(var, 'float')
         att_log.data_received_cb.add_callback(self._att_cb)
@@ -203,8 +252,8 @@ class CrazyflieDrone:
         pos_log.start()
         att_log.start()
 
-        if self.drone_config.get('need_rot_speed', False):
-            gyro_log = LogConfig(name='gyro', period_in_ms=10)
+        if self.drone_config.need_rot_speed:
+            gyro_log = LogConfig(name='gyro', period_in_ms=self.log_period_ms)
             for var in ('gyro.x', 'gyro.y', 'gyro.z'):
                 gyro_log.add_variable(var, 'float')
             gyro_log.data_received_cb.add_callback(self._gyro_cb)
