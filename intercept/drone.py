@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 
 from typing import Optional
 
+import rclpy
+from geometry_msgs.msg import TransformStamped, PoseStamped
+
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
@@ -19,6 +22,36 @@ STAB_MODE_RATE = 0
 STAB_MODE_ANGLE = 1
 STAB_ESTIMATOR_DEFAULT = 1
 STAB_ESTIMATOR_KALMAN = 2
+
+
+class DronePosePublisher:
+    def __init__(self, world_frame: str = 'world', node_name: str = 'intercept_drone_pose') -> None:
+        self._world_frame = world_frame
+        self._node_name = node_name
+        self._owns_rclpy = not rclpy.ok()
+        if self._owns_rclpy:
+            rclpy.init()
+        self._node = rclpy.create_node(node_name)
+        self._pub = self._node.create_publisher(PoseStamped, 'drone_pose', 10)
+        self._connected = True
+
+    def publish(self, drone_id: str, drone: ic.DroneState) -> None:
+        if not self._connected or not rclpy.ok():
+            return
+
+        msg = PoseStamped()
+        msg.header.stamp = self._node.get_clock().now().to_msg()
+        msg.header.frame_id = self._world_frame
+        px, py, pz = drone.pos
+        msg.pose.position.x = float(px)
+        msg.pose.position.y = float(py)
+        msg.pose.position.z = float(pz)
+        qw, qx, qy, qz = drone.quat_wxyz
+        msg.pose.orientation.x = float(qx)
+        msg.pose.orientation.y = float(qy)
+        msg.pose.orientation.z = float(qz)
+        msg.pose.orientation.w = float(qw)
+        self._pub.publish(msg)
 
 
 class StateBuffer:
@@ -122,7 +155,7 @@ class Drone(ABC):
 
 
 class CrazyflieDrone(Drone):
-    def __init__(self, drone_config: ic.DroneConfig):
+    def __init__(self, drone_config: ic.DroneConfig, pose_publisher: Optional[DronePosePublisher] = None):
         self.name = drone_config.name
         self.uri = drone_config.uri
         self.drone_config = drone_config
@@ -135,6 +168,17 @@ class CrazyflieDrone(Drone):
         self.cf = Crazyflie(rw_cache=drone_config.cache_dir)
         self.state = StateBuffer()
         self.connected = False
+        self.pose_publisher = pose_publisher
+
+    def _relax_setpoint_priority(self, wait_s: float = 0.1) -> None:
+        """Hand control back to the high-level commander after low-level setpoints."""
+        try:
+            self.cf.commander.send_notify_setpoint_stop()
+        except Exception:
+            print(f'[{self.name}] Error relaxing commander priority for {self.uri}')
+            return
+        if wait_s > 0.0:
+            time.sleep(wait_s)
 
     def _require_connected(self, action: str) -> bool:
         """Return ``True`` if connected, otherwise log why ``action`` was skipped."""
@@ -150,9 +194,18 @@ class CrazyflieDrone(Drone):
         while not self.connected:
             time.sleep(0.1)
 
+    def setup(self):
+        self._setup_params()
+        self._setup_loggers()
+
     def disconnect(self):
-        self._on_disconnected(self.uri)
         self.cf.close_link()
+        deadline = time.time() + 1.0
+        while self.connected and time.time() < deadline:
+            time.sleep(0.05)
+        if self.connected:
+            print(f'[{self.name}] Disconnected from {self.uri}')
+            self.connected = False
 
     def arm(self):
         if not self._require_connected('arm'):
@@ -169,6 +222,7 @@ class CrazyflieDrone(Drone):
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
         time.sleep(0.1)
+        self._relax_setpoint_priority()
 
         print(f'[{self.name}] Armed. Commander unlocked. Ready to take off.')
 
@@ -186,18 +240,19 @@ class CrazyflieDrone(Drone):
 
         print(f'[{self.name}] Taking off to {height:.2f} m over {duration:.1f} s...')
 
-        steps = max(1, int(duration / self.control_dt))
-        for _ in range(steps):
-            self.cf.commander.send_hover_setpoint(0.0, 0.0, 0.0, height)
-            time.sleep(self.control_dt)
+        self._relax_setpoint_priority()
+        self.cf.high_level_commander.takeoff(height, duration)
+        time.sleep(duration + 1.0)  # wait for takeoff to complete
 
-    def land(self):
+    def land(self, duration: float = 3.0):
         if not self._require_connected('land'):
             return
 
-        print(f'[{self.name}] Sending zero-thrust setpoint for landing...')
-        self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
-        time.sleep(1.0)
+        print(f'[{self.name}] Landing over {duration:.1f} s...')
+
+        self._relax_setpoint_priority()
+        self.cf.high_level_commander.land(0.1, duration)
+        time.sleep(duration + 1.0)  # wait for landing to complete
 
     def get_state(self) -> Optional[ic.DroneState]:
         return self.state.snapshot()
@@ -230,9 +285,12 @@ class CrazyflieDrone(Drone):
         self.cf.commander.send_position_setpoint(
             float(x), float(y), float(z), float(yaw_deg))
 
-    def setup(self):
-        self._setup_params()
-        self._setup_loggers()
+    def publish_pose(self):
+        if self.pose_publisher is None:
+            return
+        state = self.get_state()
+        if state is not None:
+            self.pose_publisher.publish(drone_id=self.name, drone=state)
 
     def _on_connected(self, link_uri):
         print(f'[{self.name}] Connected to {link_uri}')
@@ -240,11 +298,6 @@ class CrazyflieDrone(Drone):
 
     def _on_disconnected(self, link_uri):
         print(f'[{self.name}] Disconnected from {link_uri}')
-        try:
-            self.cf.commander.send_stop_setpoint()
-            self.cf.commander.send_notify_setpoint_stop()
-        except Exception:
-            print(f'[{self.name}] Error sending stop setpoint to {link_uri}')
         self.connected = False
 
     def _setup_params(self):
@@ -259,25 +312,28 @@ class CrazyflieDrone(Drone):
             'pos_vel',
             ('stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
              'stateEstimate.vx', 'stateEstimate.vy', 'stateEstimate.vz'),
+            ('float', 'float', 'float', 'float', 'float', 'float'),
             self._pos_vel_cb,
         )
         self._start_log(
             'attitude',
             ('stateEstimate.qw', 'stateEstimate.qx',
              'stateEstimate.qy', 'stateEstimate.qz'),
+            ('float', 'float', 'float', 'float'),
             self._att_cb,
         )
         if self.drone_config.need_rot_speed:
             self._start_log(
                 'gyro',
                 ('gyro.x', 'gyro.y', 'gyro.z'),
+                ('float', 'float', 'float'),
                 self._gyro_cb,
             )
 
-    def _start_log(self, name, variables, callback):
+    def _start_log(self, name, variables, types, callback):
         log_config = LogConfig(name=name, period_in_ms=self.log_period_ms)
-        for var in variables:
-            log_config.add_variable(var, 'float')
+        for var, type in zip(variables, types):
+            log_config.add_variable(var, type)
         log_config.data_received_cb.add_callback(callback)
         self.cf.log.add_config(log_config)
         log_config.start()

@@ -10,6 +10,7 @@ artifact_dir: artifacts/intercept_ppo_crazyflie_v4.4  # Folder with policy_ts.pt
 pursuer:
   name: pursuer
   uri: radio://0/40/2M/E7E7E7E701      # Crazyflie URI of the pursuer.
+  # uri: udp://127.0.0.1:19850
   cache_dir: ./cache-pursuer                    # cflib read/write cache directory.
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
@@ -24,6 +25,7 @@ pursuer:
 evader:
   name: evader
   uri: radio://0/40/2M/E7E7E7E702    # Evader Crazyflie URI (when source == cf).
+  # uri: udp://127.0.0.1:19851
   cache_dir: ./cache-evader                    # cflib read/write cache directory.
   control_dt: 0.02                 # 0 = use the policy's training dt.
   log_period_ms: 20                 # Log decoded body rates + thrust every N ms (0 = disable).
