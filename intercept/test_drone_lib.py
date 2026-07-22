@@ -35,7 +35,8 @@ if __name__ == "__main__":
         drone.connect()
         drone.setup()
 
-        mocap_receiver.register(rigid_body_id=31, drone=drone)
+        # mocap_receiver.register(rigid_body_id=31, drone=drone)
+        mocap_receiver.register_marker(marker_id=50002, drone=drone)
         mocap_receiver.start()
 
         drone.arm()
@@ -50,21 +51,22 @@ if __name__ == "__main__":
                 drone.publish_pose()
 
                 # dummy CTBR
-                ctbr_command = ic.CTBRCommand(
-                    body_rate_deg=ic.torch.Tensor([0.0, 0.0, 0.0]),
-                    thrust_ratio=ic.torch.Tensor([0.5]),
-                    thrust_pwm=ic.torch.Tensor([50000])
-                )
+                # ctbr_command = ic.CTBRCommand(
+                #     body_rate_deg=ic.torch.Tensor([0.0, 0.0, 0.0]),
+                #     thrust_ratio=ic.torch.Tensor([0.5]),
+                #     thrust_pwm=ic.torch.Tensor([50000])
+                # )
 
-                drone.send_ctbr(ctbr_command)
+                # drone.send_ctbr(ctbr_command)
 
                 # drone.send_position_setpoint(*position_hold)
                 time.sleep(drone.control_dt)
             except KeyboardInterrupt:
                 break
     finally:
-        drone.land()
-        drone.disarm()
+        if drone.armed:
+            drone.land()
+            drone.disarm()
 
         mocap_tf_publisher.close()
         mocap_receiver.stop()

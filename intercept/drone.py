@@ -172,6 +172,7 @@ class CrazyflieDrone(Drone):
         self.cf = Crazyflie(rw_cache=drone_config.cache_dir)
         self.state = StateBuffer()
         self.connected = False
+        self.armed = False
         self.pose_publisher = pose_publisher
 
     def _relax_setpoint_priority(self, wait_s: float = 0.1) -> None:
@@ -189,6 +190,12 @@ class CrazyflieDrone(Drone):
         if not self.connected:
             print(f'[{self.name}] Cannot {action}, not connected to {self.uri}')
         return self.connected
+
+    def _require_armed(self, action: str) -> bool:
+        """Return ``True`` if armed, otherwise log why ``action`` was skipped."""
+        if not self.armed:
+            print(f'[{self.name}] Cannot {action}, drone is not armed')
+        return self.armed
 
     def connect(self):
         self.cf.connected.add_callback(self._on_connected)
@@ -228,6 +235,7 @@ class CrazyflieDrone(Drone):
         time.sleep(0.1)
         self._relax_setpoint_priority()
 
+        self.armed = True
         print(f'[{self.name}] Armed. Commander unlocked. Ready to take off.')
 
     def disarm(self):
@@ -236,10 +244,11 @@ class CrazyflieDrone(Drone):
         self.cf.supervisor.send_arming_request(False)
         time.sleep(1.0)
 
+        self.armed = False
         print(f'[{self.name}] Disarmed. Commander locked. Motors stopped.')
 
     def takeoff(self, height, duration: float = 3.0):
-        if not self._require_connected('takeoff'):
+        if not self._require_connected('takeoff') or not self._require_armed('takeoff'):
             return
 
         print(f'[{self.name}] Taking off to {height:.2f} m over {duration:.1f} s...')
@@ -249,7 +258,7 @@ class CrazyflieDrone(Drone):
         time.sleep(duration + 1.0)  # wait for takeoff to complete
 
     def land(self, duration: float = 3.0):
-        if not self._require_connected('land'):
+        if not self._require_connected('land') or not self._require_armed('land'):
             return
 
         print(f'[{self.name}] Landing over {duration:.1f} s...')
@@ -310,6 +319,7 @@ class CrazyflieDrone(Drone):
     def _on_disconnected(self, link_uri):
         print(f'[{self.name}] Disconnected from {link_uri}')
         self.connected = False
+        self.armed = False
 
     def _setup_params(self):
         # Set the stabilizer mode to rate mode for roll and pitch
