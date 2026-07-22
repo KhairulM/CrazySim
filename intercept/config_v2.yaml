@@ -77,7 +77,8 @@ mocap:
   command_port: 1510
   data_port: 1511
   # Body-frame correction quaternion [qx, qy, qz, qw] mapping Motive -> ROS FLU.
-  body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  # body_to_flu_quat_xyzw: [0.0, 0.0, -0.7071067811865476, 0.7071067811865476]
+  body_to_flu_quat_xyzw: [0.0, 0.0, 0.0, 1.0]
   
   mocap_send_rate_hz: 30.0
   publish_tf: false                  # Also publish poses on the ROS 2 /tf tree.

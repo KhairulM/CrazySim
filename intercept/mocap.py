@@ -86,8 +86,8 @@ class MocapReceiver:
     The receiver owns a background NatNet thread (started by :meth:`start`).
     Each rigid-body frame is transformed into the ROS FLU convention via
     :func:`intercept_common.transform_mocap_pose` and pushed to the Drone
-    registered under the matching streaming id through ``extpos.send_extpose``.
-    Poses are optionally re-published on a ROS 2 TF tree. Frames for
+    registered under the matching streaming id through ``extpos.send_extpos``.
+    Position are optionally re-published on a ROS 2 TF tree. Frames for
     unregistered ids are ignored.
     """
 
@@ -101,6 +101,7 @@ class MocapReceiver:
         self._lock = threading.Lock()
         self._client = None
         self._connected = False
+        self._min_dt = 1.0 / self._cfg.mocap_send_rate_hz
 
     def register(self, rigid_body_id: int, drone: Drone,
                  frame_id: Optional[str] = None) -> None:
@@ -127,8 +128,8 @@ class MocapReceiver:
         client.commandPort = self._cfg.command_port
         client.dataPort = self._cfg.data_port
         client.rigidBodyListener = self._on_rigid_body
-        client.markerListener = self._on_labeled_marker
-        client.unlabeledMarkerListener = self._on_unlabeled_markers
+        # client.markerListener = self._on_labeled_marker
+        # client.unlabeledMarkerListener = self._on_unlabeled_markers
         self._client = client
         client.run()
 
@@ -136,16 +137,17 @@ class MocapReceiver:
                        tracking_valid) -> None:
         if not self._connected:
             return
+
         rb_id = int(rigid_body_id)
         now = time.monotonic()
+
         with self._lock:
             target = self._targets.get(rb_id)
             if target is None:
                 return
             if self._cfg.mocap_send_rate_hz > 0.0:
-                min_dt = 1.0 / self._cfg.mocap_send_rate_hz
                 last_stamp = self._last_send_stamp.get(rb_id, 0.0)
-                if (now - last_stamp) < min_dt:
+                if (now - last_stamp) < self._min_dt:
                     return
                 self._last_send_stamp[rb_id] = now
         drone, frame_id = target
@@ -175,9 +177,7 @@ class MocapReceiver:
             if target is None:
                 return
             if self._cfg.mocap_send_rate_hz > 0.0:
-                min_dt = 1.0 / self._cfg.mocap_send_rate_hz
-                last_stamp = self._last_send_stamp.get(m_id, 0.0)
-                if (now - last_stamp) < min_dt:
+                if (now - self._last_send_stamp.get(m_id, 0.0)) < self._min_dt:
                     return
                 self._last_send_stamp[m_id] = now
         drone, frame_id = target
@@ -215,9 +215,7 @@ class MocapReceiver:
             return
         m_id = next(iter(self._marker_targets))
         if self._cfg.mocap_send_rate_hz > 0.0:
-            min_dt = 1.0 / self._cfg.mocap_send_rate_hz
-            last_stamp = self._last_send_stamp.get(m_id, 0.0)
-            if (now - last_stamp) < min_dt:
+            if (now - self._last_send_stamp.get(m_id, 0.0)) < self._min_dt:
                 return
             self._last_send_stamp[m_id] = now
 

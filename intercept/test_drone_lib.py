@@ -21,13 +21,14 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    drone_config = ic.load_drone_config_from_yaml('config.yaml', 'pursuer')
-    mocap_config = ic.load_mocap_config_from_yaml('config.yaml')
+    drone_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'evader')
+    mocap_config = ic.load_mocap_config_from_yaml('config_v2.yaml')
 
     cflib.crtp.init_drivers()
 
     drone_pose_publisher = DronePosePublisher(world_frame="world")
     drone = CrazyflieDrone(drone_config, pose_publisher=drone_pose_publisher)
+
     mocap_tf_publisher = MocapTfPublisher(world_frame="world")
     mocap_receiver = MocapReceiver(mocap_config, tf_publisher=mocap_tf_publisher)
 
@@ -35,8 +36,8 @@ if __name__ == "__main__":
         drone.connect()
         drone.setup()
 
-        # mocap_receiver.register(rigid_body_id=31, drone=drone)
-        mocap_receiver.register_marker(marker_id=50002, drone=drone)
+        mocap_receiver.register(rigid_body_id=32, drone=drone)
+        # mocap_receiver.register_marker(marker_id=50002, drone=drone)
         mocap_receiver.start()
 
         drone.arm()
