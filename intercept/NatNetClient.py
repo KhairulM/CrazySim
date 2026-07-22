@@ -55,6 +55,16 @@ class NatNetClient:
         # Optional callback for per-frame metadata.
         self.newFrameListener: Optional[Callable[..., None]] = None
 
+        # Callback for labeled markers: called once per labeled marker with (id, position, size, occluded).
+        self.markerListener: Optional[
+            Callable[[int, tuple[float, float, float], float, bool], None]
+        ] = None
+
+        # Callback for unlabeled markers: called once per frame with a list of (x, y, z) tuples.
+        self.unlabeledMarkerListener: Optional[
+            Callable[[list[tuple[float, float, float]]], None]
+        ] = None
+
         # NatNet stream version. This will be updated to the actual version the server is using during initialization.
         self.__natNetStreamVersion = (3, 0, 0, 0)
 
@@ -216,10 +226,16 @@ class NatNetClient:
         offset += 4
         trace('Unlabeled Markers Count:', unlabeledMarkersCount)
 
+        unlabeled_positions = []
         for i in range(0, unlabeledMarkersCount):
             pos = Vector3.unpack(data[offset:offset+12])
             offset += 12
+            unlabeled_positions.append(pos)
             trace('\tMarker', i, ':', pos[0], ',', pos[1], ',', pos[2])
+
+        # Send unlabeled marker information to any listener.
+        if self.unlabeledMarkerListener is not None and unlabeled_positions:
+            self.unlabeledMarkerListener(unlabeled_positions)
 
         # Rigid body count (4 bytes)
         rigidBodyCount = int.from_bytes(data[offset:offset+4], byteorder='little')
@@ -253,6 +269,9 @@ class NatNetClient:
                 offset += 4
 
                 # Version 2.6 and later
+                occluded = False
+                pointCloudSolved = False
+                modelSolved = False
                 if ((self.__natNetStreamVersion[0] == 2 and self.__natNetStreamVersion[1] >= 6) or self.__natNetStreamVersion[0] > 2 or self.__natNetStreamVersion[0] == 0):
                     param, = struct.unpack('h', data[offset:offset+2])
                     offset += 2
@@ -265,6 +284,10 @@ class NatNetClient:
                     residual, = FloatValue.unpack(data[offset:offset+4])
                     offset += 4
                     trace('Residual:', residual)
+
+                # Send labeled marker information to any listener.
+                if self.markerListener is not None:
+                    self.markerListener(id, pos, size[0], occluded)
 
         # Force Plate data (version 2.9 and later)
         if ((self.__natNetStreamVersion[0] == 2 and self.__natNetStreamVersion[1] >= 9) or self.__natNetStreamVersion[0] > 2):
