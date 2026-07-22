@@ -7,3 +7,13 @@
 crazyswarm2_ws/*
 !crazyswarm2_ws/src/
 *.csv
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# cflib cache directories (in intercept/)
+intercept/cache-pursuer/
+intercept/cache-evader/
+intercept/cache/
