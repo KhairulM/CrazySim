@@ -95,7 +95,7 @@ class MocapReceiver:
                  tf_publisher: Optional[MocapTfPublisher] = None) -> None:
         self._cfg = cfg
         self._tf_publisher = tf_publisher
-        self._targets: dict = {}
+        self._targets: dict[int, tuple[Drone, str]] = {}
         self._last_send_stamp: dict[int, float] = {}
         self._lock = threading.Lock()
         self._client = None
@@ -146,7 +146,8 @@ class MocapReceiver:
             return
 
         try:
-            drone.send_mocap_pose(pose)
+            # drone.send_mocap_pose(pose)
+            drone.send_mocap_pos(pose.position)
         except Exception:  # pragma: no cover - link may be tearing down
             return
 

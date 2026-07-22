@@ -83,7 +83,7 @@ def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
     return ic.decode_action_to_ctbr(raw_action, metadata.ctbr)
 
 
-class InterceptDemoController:
+class InterceptController:
     def __init__(self, args: argparse.Namespace) -> None:
         self.config_path = os.path.abspath(os.path.expanduser(args.config))
         self.artifact_dir = str(args.artifact_dir)
@@ -489,7 +489,7 @@ def main(argv=None) -> None:
         config=args.config,
         artifact_dir=artifact_dir,
     )
-    controller = InterceptDemoController(controller_args)
+    controller = InterceptController(controller_args)
     controller.run()
 
 

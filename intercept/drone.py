@@ -106,52 +106,56 @@ class Drone(ABC):
 
     @abstractmethod
     def connect(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def setup(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def disconnect(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def arm(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def disarm(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def takeoff(self, height, duration: float = 3.0):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def land(self):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_state(self) -> Optional[ic.DroneState]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def set_param(self, group, name, value):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def send_mocap_pose(self, pose: ic.MocapPose):
-        pass
+        raise NotImplementedError
+
+    @abstractmethod
+    def send_mocap_pos(self, position: tuple[float, float, float]):
+        raise NotImplementedError
 
     @abstractmethod
     def send_ctbr(self, command: ic.CTBRCommand):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def send_position_setpoint(self, x: float, y: float, z: float,
                                yaw_deg: float = 0.0):
-        pass
+        raise NotImplementedError
 
 
 class CrazyflieDrone(Drone):
@@ -267,6 +271,13 @@ class CrazyflieDrone(Drone):
             self.cf.extpos.send_extpose(px, py, pz, qx, qy, qz, qw)
         except Exception:  # pragma: no cover - link may be tearing down
             print(f'[{self.name}] Error sending mocap pose to {self.uri}')
+
+    def send_mocap_pos(self, position: tuple[float, float, float]):
+        px, py, pz = position
+        try:
+            self.cf.extpos.send_extpos(px, py, pz)
+        except Exception:  # pragma: no cover - link may be tearing down
+            print(f'[{self.name}] Error sending mocap position to {self.uri}')
 
     def send_ctbr(self, command: ic.CTBRCommand):
         rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)  # deg/s
