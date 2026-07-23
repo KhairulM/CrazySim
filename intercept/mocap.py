@@ -98,10 +98,12 @@ class MocapReceiver:
         self._targets: dict[int, tuple[Drone, str]] = {}
         self._marker_targets: dict[int, tuple[Drone, str]] = {}
         self._last_send_stamp: dict[int, float] = {}
+        self._first_send_stamp: dict[int, float] = {}
         self._lock = threading.Lock()
         self._client = None
         self._connected = False
         self._min_dt = 1.0 / self._cfg.mocap_send_rate_hz
+        self._orientation_align_time = self._cfg.orientation_align_time
 
     def register(self, rigid_body_id: int, drone: Drone,
                  frame_id: Optional[str] = None) -> None:
@@ -137,10 +139,14 @@ class MocapReceiver:
                        tracking_valid) -> None:
         if not self._connected:
             return
+        
+        if not tracking_valid:
+            return
 
         rb_id = int(rigid_body_id)
         now = time.monotonic()
 
+        # Frequency throttling: only send at the configured rate (if > 0.0 Hz).
         with self._lock:
             target = self._targets.get(rb_id)
             if target is None:
@@ -150,16 +156,26 @@ class MocapReceiver:
                 if (now - last_stamp) < self._min_dt:
                     return
                 self._last_send_stamp[rb_id] = now
+        
         drone, frame_id = target
+        
+        # Send the first pose with orientation to align the EKF, then send only position for the rest of the time.
+        first_send_stamp = self._first_send_stamp.get(rb_id)
+        if first_send_stamp is None:
+            self._first_send_stamp[rb_id] = now
+            first_send_stamp = now
 
         pose = ic.transform_mocap_pose(
             self._cfg, rb_id, position, rotation, tracking_valid)
-        if not pose.tracking_valid:
-            return
-
+        
         try:
-            # drone.send_mocap_pose(pose)
-            drone.send_mocap_pos(pose.position)
+            if (now - first_send_stamp) < self._orientation_align_time:
+                drone.send_mocap_pose(pose)
+            else:
+                if not drone.mocap_orientation_aligned.is_set():
+                    drone.mocap_orientation_aligned.set()
+                    
+                drone.send_mocap_pos(pose.position)
         except Exception:  # pragma: no cover - link may be tearing down
             return
 

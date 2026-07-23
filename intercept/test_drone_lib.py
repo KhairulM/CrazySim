@@ -21,7 +21,7 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    drone_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'evader')
+    drone_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'pursuer')
     mocap_config = ic.load_mocap_config_from_yaml('config_v2.yaml')
 
     cflib.crtp.init_drivers()
@@ -36,13 +36,13 @@ if __name__ == "__main__":
         drone.connect()
         drone.setup()
 
-        mocap_receiver.register(rigid_body_id=32, drone=drone)
+        mocap_receiver.register(rigid_body_id=31, drone=drone)
         # mocap_receiver.register_marker(marker_id=50002, drone=drone)
         mocap_receiver.start()
 
         drone.arm()
         drone.takeoff(0.75)
-        position_hold = (0.0, 0.0, 0.75, 0.0)
+        position_hold = (1.0, 0.0, 0.75, 0.0)
 
         while drone.connected:
             try:
@@ -60,7 +60,8 @@ if __name__ == "__main__":
 
                 # drone.send_ctbr(ctbr_command)
 
-                # drone.send_position_setpoint(*position_hold)
+                drone.send_position_setpoint(*position_hold)
+                # drone.send_hover_setpoint(position_hold[2])
                 time.sleep(drone.control_dt)
             except KeyboardInterrupt:
                 break

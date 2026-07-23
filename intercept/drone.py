@@ -174,6 +174,8 @@ class CrazyflieDrone(Drone):
         self.connected = False
         self.armed = False
         self.pose_publisher = pose_publisher
+        
+        self.mocap_orientation_aligned = threading.Event()
 
     def _relax_setpoint_priority(self, wait_s: float = 0.1) -> None:
         """Hand control back to the high-level commander after low-level setpoints."""
@@ -225,10 +227,16 @@ class CrazyflieDrone(Drone):
         self.cf.supervisor.send_arming_request(True)
         time.sleep(1.0)
 
-        print(f'[{self.name}] Arming request sent. Waiting for Kalman filter to converge...')
-        if not self._is_estimator_converged():
+        print(f'[{self.name}] Arming request sent. Waiting for Mocap to align orientation...')
+        
+        if not self.mocap_orientation_aligned.wait(timeout=10.0):
+            print(f'[{self.name}] Warning: Mocap orientation not aligned. '
+                  'Position estimate may be inaccurate.')
+        
+        if not self._is_estimator_converged(timeout=10.0):
             print(f'[{self.name}] Warning: Kalman filter not converged. '
                   'Position estimate may be inaccurate.')
+            
 
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
@@ -304,6 +312,9 @@ class CrazyflieDrone(Drone):
                                yaw_deg: float = 0.0):
         self.cf.commander.send_position_setpoint(
             float(x), float(y), float(z), float(yaw_deg))
+
+    def send_hover_setpoint(self, z: float):
+        self.cf.commander.send_hover_setpoint(0.0, 0.0, 0.0, float(z))
 
     def publish_pose(self):
         if self.pose_publisher is None:

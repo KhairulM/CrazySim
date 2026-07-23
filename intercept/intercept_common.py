@@ -380,6 +380,7 @@ class MocapConfig:
     body_to_flu_quat_xyzw: tuple = DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW
     publish_tf: bool = True
     world_frame: str = 'world'
+    orientation_align_time: float = 2.0  # seconds to align mocap orientation with EKF
 
 
 def load_mocap_config_from_yaml(path: str) -> MocapConfig:
