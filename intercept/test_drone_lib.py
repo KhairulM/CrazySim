@@ -1,11 +1,18 @@
+import intercept_common as ic
+from mocap import MocapReceiver, MocapTfPublisher
+from drone import CrazyflieDrone, DronePosePublisher
+import cflib.crtp
+import logging
 import time
 import warnings
 
-import cflib.crtp
+# Configure logging before importing modules that create loggers
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S',
+)
 
-from drone import CrazyflieDrone, DronePosePublisher
-from mocap import MocapReceiver, MocapTfPublisher
-import intercept_common as ic
 
 # Hide the known cflib warning when firmware still uses legacy hover packet type.
 warnings.filterwarnings(
@@ -27,11 +34,10 @@ if __name__ == "__main__":
 
     cflib.crtp.init_drivers()
 
-    pursuer_pose_publisher = DronePosePublisher(world_frame="world", node_name="pursuer_pose_pub")
-    pursuer = CrazyflieDrone(pursuer_config, pose_publisher=pursuer_pose_publisher)
+    drone_pose_publisher = DronePosePublisher(world_frame="world")
 
-    evader_pose_publisher = DronePosePublisher(world_frame="world", node_name="evader_pose_pub")
-    evader = CrazyflieDrone(evader_config, pose_publisher=evader_pose_publisher)
+    pursuer = CrazyflieDrone(pursuer_config, pose_publisher=drone_pose_publisher)
+    evader = CrazyflieDrone(evader_config, pose_publisher=drone_pose_publisher)
 
     mocap_tf_publisher = MocapTfPublisher(world_frame="world")
     mocap_receiver = MocapReceiver(mocap_config, tf_publisher=mocap_tf_publisher)
@@ -51,7 +57,7 @@ if __name__ == "__main__":
         evader.arm()
         pursuer.takeoff(0.75)
         evader.takeoff(0.75)
-        
+
         pursuer_position_hold = (1.0, 0.0, 0.75, 0.0)
         evader_position_hold = (0.0, 1.0, 0.75, 0.0)
 

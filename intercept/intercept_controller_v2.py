@@ -10,16 +10,38 @@ from __future__ import annotations
 import argparse
 import csv
 import importlib
+import logging
 import os
 import time
+import warnings
 from typing import Optional
 
 import numpy as np
 import torch
 
 import intercept_common as ic
-from drone import CrazyflieDrone, DronePosePublisher
+from drone import CrazyflieDrone, ScriptedDrone, DronePosePublisher
 from mocap import MocapReceiver, MocapTfPublisher
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%H:%M:%S',
+)
+
+warnings.filterwarnings(
+    'ignore',
+    message=r'Using legacy TYPE_HOVER_LEGACY\. Please update your crazyflie-firmware\.',
+    category=DeprecationWarning,
+    module=r'cflib\.crazyflie\.commander',
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message="The supervisor subsystem requires CRTP protocol version 12"
+)
 
 
 DEFAULT_CONFIG_PATH = os.path.join(
@@ -60,22 +82,24 @@ def _load_policy(artifact_dir: str):
             f'Run export_policy.py first.'
         )
     metadata = ic.load_metadata(meta_path)
-    policy = torch.jit.load(ts_path, map_location='cpu').eval()
-    print(f'[intercept] Loaded {metadata.algo} policy '
-          f'(obs_dim={metadata.obs.obs_dim}) from {ts_path}')
-    return metadata, policy
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    policy = torch.jit.load(ts_path, map_location=device).eval()
+    logger.info('[intercept] Loaded %s policy (obs_dim=%d) from %s on %s',
+                metadata.algo, metadata.obs.obs_dim, ts_path, device)
+    return metadata, policy, device
 
 
 def _build_command(policy: torch.nn.Module, metadata: ic.PolicyMetadata,
-                   pursuer: ic.DroneState, evader: ic.DroneState) -> ic.CTBRCommand:
+                   pursuer: ic.DroneState, evader: ic.DroneState,
+                   device: torch.device) -> ic.CTBRCommand:
     obs = ic.build_observation(
         metadata.obs,
-        pursuer_pos=torch.as_tensor(pursuer.pos, dtype=torch.float32),
-        pursuer_quat_wxyz=torch.as_tensor(pursuer.quat_wxyz, dtype=torch.float32),
-        pursuer_lin_vel_world=torch.as_tensor(pursuer.lin_vel, dtype=torch.float32),
-        evader_pos=torch.as_tensor(evader.pos, dtype=torch.float32),
-        pursuer_ang_vel_world=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32),
-        evader_lin_vel_world=torch.as_tensor(evader.lin_vel, dtype=torch.float32),
+        pursuer_pos=torch.as_tensor(pursuer.pos, dtype=torch.float32, device=device),
+        pursuer_quat_wxyz=torch.as_tensor(pursuer.quat_wxyz, dtype=torch.float32, device=device),
+        pursuer_lin_vel_world=torch.as_tensor(pursuer.lin_vel, dtype=torch.float32, device=device),
+        evader_pos=torch.as_tensor(evader.pos, dtype=torch.float32, device=device),
+        pursuer_ang_vel_world=torch.as_tensor(pursuer.ang_vel, dtype=torch.float32, device=device),
+        evader_lin_vel_world=torch.as_tensor(evader.lin_vel, dtype=torch.float32, device=device),
     ).reshape(1, metadata.obs.obs_dim)
 
     with torch.no_grad():
@@ -87,7 +111,7 @@ class InterceptController:
     def __init__(self, args: argparse.Namespace) -> None:
         self.config_path = os.path.abspath(os.path.expanduser(args.config))
         self.artifact_dir = str(args.artifact_dir)
-        self.metadata, self.policy = _load_policy(self.artifact_dir)
+        self.metadata, self.policy, self.device = _load_policy(self.artifact_dir)
         self._start_time = time.time()
 
         self.pursuer_config = ic.load_drone_config_from_yaml(self.config_path, 'pursuer')
@@ -148,14 +172,18 @@ class InterceptController:
         self._validate_evader_motion_config()
         self._load_evader_trajectory_if_needed()
 
-        self.pursuer_pose_publisher = DronePosePublisher(world_frame='world')
-        self.evader_pose_publisher = DronePosePublisher(world_frame='world')
+        self.drone_pose_pub = DronePosePublisher(world_frame='world')
         self.pursuer = CrazyflieDrone(
-            self.pursuer_config, pose_publisher=self.pursuer_pose_publisher
+            self.pursuer_config, pose_publisher=self.drone_pose_pub
         )
-        self.evader = CrazyflieDrone(
-            self.evader_config, pose_publisher=self.evader_pose_publisher
-        )
+        if self.evader_source == 'scripted':
+            self.evader = ScriptedDrone(
+                self.evader_config, pose_publisher=self.drone_pose_pub
+            )
+        else:
+            self.evader = CrazyflieDrone(
+                self.evader_config, pose_publisher=self.drone_pose_pub
+            )
 
         self.mocap_tf_publisher: Optional[MocapTfPublisher] = None
         self.mocap_receiver: Optional[MocapReceiver] = None
@@ -253,11 +281,12 @@ class InterceptController:
         self._evader_traj_times = t_arr
         self._evader_traj_pos = p_arr
         self._evader_traj_vel = v_arr
-        print(f'[intercept] Loaded evader trajectory from {traj_path} ({len(times)} points).')
+        logger.info('[intercept] Loaded evader trajectory from %s (%d points).', traj_path, len(times))
 
     def _setup_mocap(self) -> None:
         if not self.mocap_config.enabled:
             return
+
         if self.publish_tf:
             self.mocap_tf_publisher = MocapTfPublisher(
                 world_frame=self.mocap_world_frame
@@ -266,10 +295,14 @@ class InterceptController:
             self.mocap_config, tf_publisher=self.mocap_tf_publisher
         )
         self.mocap_receiver.register(
-            self.mocap_config.rigid_body_id, self.pursuer, frame_id='pursuer'
+            self.mocap_config.pursuer_rigid_body_id, self.pursuer, frame_id='pursuer'
         )
+        if self.evader_source == 'cf':
+            self.mocap_receiver.register(
+                self.mocap_config.evader_rigid_body_id, self.evader, frame_id='evader'
+            )
+
         self.mocap_receiver.start()
-        print(f'[intercept] Mocap enabled from {self.mocap_config.server_ip}.')
 
     def _connect_and_setup(self) -> None:
         self.pursuer.connect()
@@ -398,47 +431,51 @@ class InterceptController:
             self._evader_random_target = self.evader_motion_anchor.copy()
             self._evader_random_last_update = self._evader_motion_start_time
 
-            print(
-                f'[intercept] Running policy at {1.0 / self.control_dt:.1f} Hz. '
-                f'Ctrl+C to stop. evader_motion={self.evader_motion_type}'
+            logger.info(
+                '[intercept] Running policy at %.1f Hz. '
+                'Ctrl+C to stop. evader_motion=%s', 1.0 / self.control_dt, self.evader_motion_type
             )
             while self.pursuer.connected and self.evader.connected:
                 commanded_evader_state = self._compute_evader_motion_state()
-                if self.evader_source == 'cf':
-                    self.evader.send_position_setpoint(
-                        commanded_evader_state.pos[0],
-                        commanded_evader_state.pos[1],
-                        commanded_evader_state.pos[2],
-                        yaw_deg=self.evader_motion_yaw_deg,
-                    )
+                self.evader.send_position_setpoint(
+                    commanded_evader_state.pos[0],
+                    commanded_evader_state.pos[1],
+                    commanded_evader_state.pos[2],
+                    yaw_deg=self.evader_motion_yaw_deg,
+                )
 
                 pursuer_state = self.pursuer.get_state()
-                evader_state = self._get_evader_state(commanded_evader_state)
+                evader_state = self.evader.get_state()
                 if pursuer_state is None or evader_state is None:
                     time.sleep(self.control_dt)
                     continue
 
                 now = time.time()
                 if now - pursuer_state.stamp > self.state_timeout:
-                    print('[intercept] Pursuer state timed out; stopping.')
+                    logger.warning('[intercept] Pursuer state timed out; stopping.')
                     break
                 if pursuer_state.pos[2] < self.min_altitude:
-                    print(
-                        f'[intercept] Pursuer below min altitude '
-                        f'({pursuer_state.pos[2]:.2f} m); stopping.'
+                    logger.warning(
+                        '[intercept] Pursuer below min altitude (%.2f m); stopping.',
+                        pursuer_state.pos[2]
                     )
                     break
 
-                command = _build_command(self.policy, self.metadata, pursuer_state, evader_state)
+                command = _build_command(
+                    self.policy, self.metadata, pursuer_state, evader_state, self.device
+                )
                 self.pursuer.send_ctbr(command)
 
                 if self.log_commands:
                     rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)
                     dist = float(np.linalg.norm(evader_state.pos - pursuer_state.pos))
-                    print(
-                        f'[intercept] alt={pursuer_state.pos[2]:.2f}m dist={dist:.2f}m '
-                        f'rates(deg/s)=[{rates[0]:+.0f},{rates[1]:+.0f},{rates[2]:+.0f}] '
-                        f'thrust_pwm={float(command.thrust_pwm.item()):.0f}'
+                    logger.info(
+                        '[intercept] alt=%.2fm dist=%.2fm '
+                        'rates(deg/s)=[%+.0f,%+.0f,%+.0f] '
+                        'thrust_pwm=%.0f',
+                        pursuer_state.pos[2], dist,
+                        rates[0], rates[1], rates[2],
+                        float(command.thrust_pwm.item())
                     )
 
                 self.pursuer.publish_pose()
@@ -446,7 +483,7 @@ class InterceptController:
                     self.evader.publish_pose()
                 time.sleep(self.control_dt)
         except KeyboardInterrupt:
-            print('\n[intercept] Stopping.')
+            logger.info('[intercept] Stopping.')
         finally:
             self.shutdown()
 

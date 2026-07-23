@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 import numpy as np
@@ -14,6 +15,8 @@ from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncLogger import SyncLogger
 
 import intercept_common as ic
+
+logger = logging.getLogger(__name__)
 
 STAB_MODE_ROLL_PARAM = 'flightmode.stabModeRoll'
 STAB_MODE_PITCH_PARAM = 'flightmode.stabModePitch'
@@ -33,10 +36,20 @@ class DronePosePublisher:
             rclpy.init()
         self._node = rclpy.create_node(node_name)
         self._pub = self._node.create_publisher(PoseStamped, 'drone_pose', 10)
+        self._pubs: dict[str, rclpy.publisher.Publisher] = {}
         self._connected = True
+
+    def register(self, drone_id: str) -> None:
+        if drone_id not in self._pubs:
+            self._pubs[drone_id] = self._node.create_publisher(PoseStamped, f'drone_pose/{drone_id}', 10)
 
     def publish(self, drone_id: str, drone: ic.DroneState) -> None:
         if not self._connected or not rclpy.ok():
+            return
+
+        publisher = self._pubs.get(drone_id)
+        if publisher is None:
+            logger.warning('No publisher registered for drone_id: %s', drone_id)
             return
 
         msg = PoseStamped()
@@ -51,7 +64,7 @@ class DronePosePublisher:
         msg.pose.orientation.y = float(qy)
         msg.pose.orientation.z = float(qz)
         msg.pose.orientation.w = float(qw)
-        self._pub.publish(msg)
+        publisher.publish(msg)
 
 
 class StateBuffer:
@@ -174,7 +187,10 @@ class CrazyflieDrone(Drone):
         self.connected = False
         self.armed = False
         self.pose_publisher = pose_publisher
-        
+
+        if self.pose_publisher is not None:
+            self.pose_publisher.register(drone_id=self.name)
+
         self.mocap_orientation_aligned = threading.Event()
 
     def _relax_setpoint_priority(self, wait_s: float = 0.1) -> None:
@@ -182,7 +198,7 @@ class CrazyflieDrone(Drone):
         try:
             self.cf.commander.send_notify_setpoint_stop()
         except Exception:
-            print(f'[{self.name}] Error relaxing commander priority for {self.uri}')
+            logger.warning('[%s] Error relaxing commander priority for %s', self.name, self.uri)
             return
         if wait_s > 0.0:
             time.sleep(wait_s)
@@ -190,13 +206,13 @@ class CrazyflieDrone(Drone):
     def _require_connected(self, action: str) -> bool:
         """Return ``True`` if connected, otherwise log why ``action`` was skipped."""
         if not self.connected:
-            print(f'[{self.name}] Cannot {action}, not connected to {self.uri}')
+            logger.info('[%s] Cannot %s, not connected to %s', self.name, action, self.uri)
         return self.connected
 
     def _require_armed(self, action: str) -> bool:
         """Return ``True`` if armed, otherwise log why ``action`` was skipped."""
         if not self.armed:
-            print(f'[{self.name}] Cannot {action}, drone is not armed')
+            logger.info('[%s] Cannot %s, drone is not armed', self.name, action)
         return self.armed
 
     def connect(self):
@@ -217,7 +233,7 @@ class CrazyflieDrone(Drone):
         while self.connected and time.time() < deadline:
             time.sleep(0.05)
         if self.connected:
-            print(f'[{self.name}] Disconnected from {self.uri}')
+            logger.info('[%s] Disconnected from %s', self.name, self.uri)
             self.connected = False
 
     def arm(self):
@@ -227,16 +243,15 @@ class CrazyflieDrone(Drone):
         self.cf.supervisor.send_arming_request(True)
         time.sleep(1.0)
 
-        print(f'[{self.name}] Arming request sent. Waiting for Mocap to align orientation...')
-        
+        logger.info('[%s] Arming request sent. Waiting for Mocap to align orientation...', self.name)
+
         if not self.mocap_orientation_aligned.wait(timeout=10.0):
-            print(f'[{self.name}] Warning: Mocap orientation not aligned. '
-                  'Position estimate may be inaccurate.')
-        
+            logger.warning('[%s] Mocap orientation not aligned. '
+                           'Position estimate may be inaccurate.', self.name)
+
         if not self._is_estimator_converged(timeout=10.0):
-            print(f'[{self.name}] Warning: Kalman filter not converged. '
-                  'Position estimate may be inaccurate.')
-            
+            logger.warning('[%s] Kalman filter not converged. '
+                           'Position estimate may be inaccurate.', self.name)
 
         # The first setpoint must be a zero-thrust one to unlock the commander.
         self.cf.commander.send_setpoint(0.0, 0.0, 0.0, 0)
@@ -244,7 +259,7 @@ class CrazyflieDrone(Drone):
         self._relax_setpoint_priority()
 
         self.armed = True
-        print(f'[{self.name}] Armed. Commander unlocked. Ready to take off.')
+        logger.info('[%s] Armed. Commander unlocked. Ready to take off.', self.name)
 
     def disarm(self):
         if not self._require_connected('disarm'):
@@ -253,13 +268,13 @@ class CrazyflieDrone(Drone):
         time.sleep(1.0)
 
         self.armed = False
-        print(f'[{self.name}] Disarmed. Commander locked. Motors stopped.')
+        logger.info('[%s] Disarmed. Commander locked. Motors stopped.', self.name)
 
     def takeoff(self, height, duration: float = 3.0):
         if not self._require_connected('takeoff') or not self._require_armed('takeoff'):
             return
 
-        print(f'[{self.name}] Taking off to {height:.2f} m over {duration:.1f} s...')
+        logger.info('[%s] Taking off to %.2f m over %.1f s...', self.name, height, duration)
 
         self._relax_setpoint_priority()
         self.cf.high_level_commander.takeoff(height, duration)
@@ -269,7 +284,7 @@ class CrazyflieDrone(Drone):
         if not self._require_connected('land') or not self._require_armed('land'):
             return
 
-        print(f'[{self.name}] Landing over {duration:.1f} s...')
+        logger.info('[%s] Landing over %.1f s...', self.name, duration)
 
         self._relax_setpoint_priority()
         self.cf.high_level_commander.land(0.1, duration)
@@ -287,14 +302,14 @@ class CrazyflieDrone(Drone):
         try:
             self.cf.extpos.send_extpose(px, py, pz, qx, qy, qz, qw)
         except Exception:  # pragma: no cover - link may be tearing down
-            print(f'[{self.name}] Error sending mocap pose to {self.uri}')
+            logger.error('[%s] Error sending mocap pose to %s', self.name, self.uri)
 
     def send_mocap_pos(self, position: tuple[float, float, float]):
         px, py, pz = position
         try:
             self.cf.extpos.send_extpos(px, py, pz)
         except Exception:  # pragma: no cover - link may be tearing down
-            print(f'[{self.name}] Error sending mocap position to {self.uri}')
+            logger.error('[%s] Error sending mocap position to %s', self.name, self.uri)
 
     def send_ctbr(self, command: ic.CTBRCommand):
         rates = command.body_rate_deg.detach().cpu().numpy().reshape(-1)  # deg/s
@@ -324,11 +339,11 @@ class CrazyflieDrone(Drone):
             self.pose_publisher.publish(drone_id=self.name, drone=state)
 
     def _on_connected(self, link_uri):
-        print(f'[{self.name}] Connected to {link_uri}')
+        logger.info('[%s] Connected to %s', self.name, link_uri)
         self.connected = True
 
     def _on_disconnected(self, link_uri):
-        print(f'[{self.name}] Disconnected from {link_uri}')
+        logger.info('[%s] Disconnected from %s', self.name, link_uri)
         self.connected = False
         self.armed = False
 
@@ -404,8 +419,8 @@ class CrazyflieDrone(Drone):
         log_conf.add_variable('kalman.varPZ', 'float')
         var_hist = {'x': [1000]*10, 'y': [1000]*10, 'z': [1000]*10}
         deadline = time.time() + timeout
-        with SyncLogger(self.cf, log_conf) as logger:
-            for _, data, _ in logger:
+        with SyncLogger(self.cf, log_conf) as sync_logger:
+            for _, data, _ in sync_logger:
                 px = data['kalman.varPX']
                 py = data['kalman.varPY']
                 pz = data['kalman.varPZ']
@@ -413,19 +428,127 @@ class CrazyflieDrone(Drone):
                 for k, v in zip('xyz', (px, py, pz)):
                     var_hist[k] = var_hist[k][1:] + [v]
 
-                # Update a single terminal line with latest Kalman variances.
-                print(
-                    f'\r[{self.name}] Kalman var: '
-                    f'px={px:.6f} py={py:.6f} pz={pz:.6f}',
-                    end='',
-                    flush=True,
+                # Log latest Kalman variances (verbose level - noisy).
+                logger.debug(
+                    '[%s] Kalman var: px=%.6f py=%.6f pz=%.6f',
+                    self.name, px, py, pz,
                 )
 
                 if all(max(h) - min(h) < threshold for h in var_hist.values()):
-                    print()
                     return True
                 if time.time() > deadline:
-                    print()
                     return False
-            print()
             return False
+
+
+class ScriptedDrone(Drone):
+    """A dummy drone that implements the Drone ABC without any cflib dependency.
+
+    Used when ``evader_source == "scripted"`` so the controller can treat the
+    evader as a virtual proxy whose state is fully driven by simulated motion
+    (hover, random-walk, or pre-recorded trajectory) rather than a real radio
+    link to hardware.
+    """
+
+    def __init__(self, drone_config: ic.DroneConfig, pose_publisher=None) -> None:
+        self.name = drone_config.name
+        self.drone_config = drone_config
+        self.control_dt = drone_config.control_dt
+        self.connected = True  # "always connected" – no real link
+        self.armed = False
+        self.pose_publisher = pose_publisher
+
+        if self.pose_publisher is not None:
+            self.pose_publisher.register(drone_id=self.name)
+
+        # Internal simulated state (starts at origin, identity quat).
+        self._state_buffer = StateBuffer()
+
+    # -- connection lifecycle ------------------------------------------------
+
+    def connect(self) -> None:
+        """No-op – scripted drone is always "connected"."""
+        self.connected = True
+        logger.info('[%s] Scripted drone ready (no real link)', self.name)
+
+    def setup(self) -> None:
+        """No-op – nothing to configure on a virtual drone."""
+        pass
+
+    def disconnect(self) -> None:
+        """Clean-up; simply mark as disconnected."""
+        self.connected = False
+        self.armed = False
+        logger.info('[%s] Scripted drone stopped', self.name)
+
+    # -- arming --------------------------------------------------------------
+
+    def arm(self) -> None:
+        self.armed = True
+        logger.info('[%s] Armed (scripted)', self.name)
+
+    def disarm(self) -> None:
+        self.armed = False
+        logger.info('[%s] Disarmed (scripted)', self.name)
+
+    # -- high-level commands -------------------------------------------------
+
+    def takeoff(self, height, duration: float = 3.0) -> None:
+        """Pre-fill the state buffer so ``get_state()`` returns something valid."""
+        logger.info('[%s] Scripted takeoff to %.2f m (no real flight)', self.name, height)
+        # Seed an initial position at (0, 0, height) so the rest of the
+        # pipeline sees a plausible starting state.
+        self._state_buffer.update_pos_vel(0.0, 0.0, height, 0.0, 0.0, 0.0)
+        self._state_buffer.update_quat(1.0, 0.0, 0.0, 0.0)
+        self._state_buffer.update_gyro_deg(0.0, 0.0, 0.0)
+
+    def land(self, duration: float = 3.0) -> None:
+        logger.info('[%s] Scripted landing (no-op)', self.name)
+
+    # -- state ---------------------------------------------------------------
+
+    def get_state(self) -> Optional[ic.DroneState]:
+        return self._state_buffer.snapshot()
+
+    # -- low-level commands (no-ops – scripted evader doesn't fly) -----------
+
+    def set_param(self, group, name, value) -> None:
+        pass
+
+    def send_mocap_pose(self, pose: ic.MocapPose) -> None:
+        """Update internal state from mocap so get_state() reflects reality."""
+        px, py, pz = pose.position
+        qw, qx, qy, qz = pose.quat_wxyz  # use the wxyz property directly
+        self._state_buffer.update_pos_vel(px, py, pz, 0.0, 0.0, 0.0)
+        self._state_buffer.update_quat(qw, qx, qy, qz)
+
+    def send_mocap_pos(self, position: tuple[float, float, float]) -> None:
+        """Update internal state from mocap position only."""
+        px, py, pz = position
+        self._state_buffer.update_pos_vel(px, py, pz, 0.0, 0.0, 0.0)
+
+    def send_ctbr(self, command: ic.CTBRCommand) -> None:
+        """No-op – scripted drone doesn't accept control commands."""
+        pass
+
+    def send_position_setpoint(self, x: float, y: float, z: float,
+                               yaw_deg: float = 0.0) -> None:
+        """Update internal state to reflect the commanded position."""
+        self._state_buffer.update_pos_vel(
+            x, y, z, 0.0, 0.0, 0.0
+        )
+
+    def send_hover_setpoint(self, z: float) -> None:
+        """Update internal state z to reflect the commanded hover altitude."""
+        current = self._state_buffer._pos.copy() if self._state_buffer._pos_stamp > 0 else np.zeros(3)
+        current[2] = z
+        self._state_buffer.update_pos_vel(
+            current[0], current[1], current[2], 0.0, 0.0, 0.0
+        )
+
+    def publish_pose(self) -> None:
+        if self.pose_publisher is None:
+            return
+        state = self.get_state()
+        if state is not None:
+            self.pose_publisher.publish(drone_id=self.name, drone=state)

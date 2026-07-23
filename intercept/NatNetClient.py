@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # OptiTrack NatNet direct depacketization library for Python 3.x
+import logging
 import socket
 import struct
 from threading import Thread
 from typing import Callable
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def trace(*args):
@@ -529,13 +532,13 @@ class NatNetClient:
         # Create the data socket
         self.dataSocket = self.__createDataSocket(self.dataPort)
         if (self.dataSocket is None):
-            print('Could not open data channel')
+            logger.error('Could not open data channel')
             raise RuntimeError('Could not open data channel')
 
         # Create the command socket
         self.commandSocket = self.__createCommandSocket()
         if (self.commandSocket is None):
-            print('Could not open command channel')
+            logger.error('Could not open command channel')
             raise RuntimeError('Could not open command channel')
 
         # Create a separate thread for receiving data packets

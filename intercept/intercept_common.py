@@ -374,7 +374,8 @@ class MocapConfig:
     multicast_address: str = '239.255.42.99'
     command_port: int = 1510
     data_port: int = 1511
-    rigid_body_id: int = 31
+    pursuer_rigid_body_id: int = 31
+    evader_rigid_body_id: int = 32
     # Maximum forwarding rate for extpose updates to the drone.
     mocap_send_rate_hz: float = 30.0
     body_to_flu_quat_xyzw: tuple = DEFAULT_MOCAP_BODY_TO_FLU_QUAT_XYZW
