@@ -21,35 +21,47 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    drone_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'pursuer')
+    pursuer_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'pursuer')
+    evader_config = ic.load_drone_config_from_yaml('config_v2.yaml', 'evader')
     mocap_config = ic.load_mocap_config_from_yaml('config_v2.yaml')
 
     cflib.crtp.init_drivers()
 
-    drone_pose_publisher = DronePosePublisher(world_frame="world")
-    drone = CrazyflieDrone(drone_config, pose_publisher=drone_pose_publisher)
+    pursuer_pose_publisher = DronePosePublisher(world_frame="world", node_name="pursuer_pose_pub")
+    pursuer = CrazyflieDrone(pursuer_config, pose_publisher=pursuer_pose_publisher)
+
+    evader_pose_publisher = DronePosePublisher(world_frame="world", node_name="evader_pose_pub")
+    evader = CrazyflieDrone(evader_config, pose_publisher=evader_pose_publisher)
 
     mocap_tf_publisher = MocapTfPublisher(world_frame="world")
     mocap_receiver = MocapReceiver(mocap_config, tf_publisher=mocap_tf_publisher)
 
     try:
-        drone.connect()
-        drone.setup()
+        pursuer.connect()
+        pursuer.setup()
+        evader.connect()
+        evader.setup()
 
-        mocap_receiver.register(rigid_body_id=31, drone=drone)
+        mocap_receiver.register(rigid_body_id=31, drone=pursuer)
+        mocap_receiver.register(rigid_body_id=32, drone=evader)
         # mocap_receiver.register_marker(marker_id=50002, drone=drone)
         mocap_receiver.start()
 
-        drone.arm()
-        drone.takeoff(0.75)
-        position_hold = (1.0, 0.0, 0.75, 0.0)
+        pursuer.arm()
+        evader.arm()
+        pursuer.takeoff(0.75)
+        evader.takeoff(0.75)
+        
+        pursuer_position_hold = (1.0, 0.0, 0.75, 0.0)
+        evader_position_hold = (0.0, 1.0, 0.75, 0.0)
 
-        while drone.connected:
+        while pursuer.connected and evader.connected:
             try:
-                state = drone.get_state()
-                print(f"Drone state: {state}")
+                # state = pursuer.get_state()
+                # print(f"Drone state: {state}")
 
-                drone.publish_pose()
+                pursuer.publish_pose()
+                evader.publish_pose()
 
                 # dummy CTBR
                 # ctbr_command = ic.CTBRCommand(
@@ -60,16 +72,21 @@ if __name__ == "__main__":
 
                 # drone.send_ctbr(ctbr_command)
 
-                drone.send_position_setpoint(*position_hold)
+                pursuer.send_position_setpoint(*pursuer_position_hold)
+                evader.send_position_setpoint(*evader_position_hold)
                 # drone.send_hover_setpoint(position_hold[2])
-                time.sleep(drone.control_dt)
+                time.sleep(pursuer.control_dt)
             except KeyboardInterrupt:
                 break
     finally:
-        if drone.armed:
-            drone.land()
-            drone.disarm()
+        if pursuer.armed:
+            pursuer.land()
+            pursuer.disarm()
+        if evader.armed:
+            evader.land()
+            evader.disarm()
 
         mocap_tf_publisher.close()
         mocap_receiver.stop()
-        drone.disconnect()
+        pursuer.disconnect()
+        evader.disconnect()
