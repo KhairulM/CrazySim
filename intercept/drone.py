@@ -342,8 +342,9 @@ class CrazyflieDrone(Drone):
         logger.info('[%s] Connected to %s', self.name, link_uri)
         self.connected = True
 
-    def _on_disconnected(self, link_uri):
-        logger.info('[%s] Disconnected from %s', self.name, link_uri)
+    def _on_disconnected(self, link_uri, msg=None):
+        logger.info('[%s] Disconnected from %s%s', self.name, link_uri,
+                    f' ({msg})' if msg else '')
         self.connected = False
         self.armed = False
 
