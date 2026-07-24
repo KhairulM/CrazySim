@@ -59,7 +59,7 @@ if __name__ == "__main__":
         evader.takeoff(0.75)
 
         pursuer_position_hold = (1.0, 0.0, 0.75, 0.0)
-        evader_position_hold = (0.0, 1.0, 0.75, 0.0)
+        evader_position_hold = (1.0, 0.0, 0.75, 0.0)
 
         while pursuer.connected and evader.connected:
             try:

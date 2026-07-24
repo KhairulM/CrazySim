@@ -211,6 +211,30 @@ def quaternion_to_rotation_matrix_np(quat_wxyz: np.ndarray) -> np.ndarray:
     ], dtype=np.float64)
 
 
+def quat_rotate_inverse(quat_wxyz: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
+    """Rotate a vector by the inverse of a quaternion (world -> body frame).
+
+    Equivalent to ``R^T @ v`` where ``R`` is the rotation matrix for ``quat_wxyz``.
+    Matches ``omni_drones/utils/torch.py::quat_rotate_inverse`` so that the
+    deployment observation pipeline produces bit-identical values to training.
+
+    Args:
+        quat_wxyz: ``[..., 4]`` quaternion in ``(w, x, y, z)`` convention.
+        vec: ``[..., 3]`` vector expressed in world frame.
+
+    Returns:
+        ``[..., 3]`` vector rotated into the body frame.
+    """
+    q_vec = quat_wxyz[..., 1:]          # (x, y, z)
+    q_imag_sq = (q_vec * q_vec).sum(-1, keepdim=True)
+
+    # v' = (w^2 - |v|^2) * v + 2 * (v . v_q) * v_q + 2 * w * (v_q x v)
+    factor0 = quat_wxyz[..., :1] ** 2 - q_imag_sq
+    dot = (q_vec * vec).sum(-1, keepdim=True)
+    cross = torch.cross(q_vec, vec, dim=-1)
+    return factor0 * vec + 2.0 * dot * q_vec + 2.0 * quat_wxyz[..., :1] * cross
+
+
 # ---------------------------------------------------------------------------
 # Observation construction
 # ---------------------------------------------------------------------------
@@ -230,6 +254,10 @@ def build_observation(
     the quaternion is ``(w, x, y, z)`` and linear/angular velocities are
     expressed in the **world** frame (as returned by ``drone.get_state()``).
 
+    Velocities are transformed to the pursuer's body frame before being
+    concatenated, so that the observation matches what training sees
+    (see :meth:`Intercept._compute_state_and_obs`).
+
     Args:
         cfg: Observation layout flags (must match the trained policy).
         pursuer_pos: ``[..., 3]`` pursuer position in world frame.
@@ -248,7 +276,12 @@ def build_observation(
     pursuer_rot = quaternion_to_rotation_matrix(pursuer_quat_wxyz)
     pursuer_rot = pursuer_rot.reshape(*pursuer_rot.shape[:-2], 9)  # (9)
 
-    components = [evader_rel_hdg, pursuer_lin_vel_world, pursuer_rot]
+    # Transform velocities to pursuer body frame so the deployment observation
+    # matches bit-for-bit what training produces.
+    pursuer_lin_vel_body = quat_rotate_inverse(
+        pursuer_quat_wxyz, pursuer_lin_vel_world)
+
+    components = [evader_rel_hdg, pursuer_lin_vel_body, pursuer_rot]
 
     if cfg.use_ab_world_frame:
         components.append(pursuer_pos)  # (3)
@@ -260,14 +293,19 @@ def build_observation(
             raise ValueError(
                 'use_relative_velocity=True requires evader_lin_vel_world.'
             )
-        components.append(evader_lin_vel_world - pursuer_lin_vel_world)  # (3)
+        # Both velocities in body frame so the difference is also body-frame.
+        evader_lin_vel_body = quat_rotate_inverse(
+            pursuer_quat_wxyz, evader_lin_vel_world)
+        components.append(evader_lin_vel_body - pursuer_lin_vel_body)  # (3)
 
     if cfg.use_rot_speed:
         if pursuer_ang_vel_world is None:
             raise ValueError(
                 'use_rot_speed=True requires pursuer_ang_vel_world.'
             )
-        components.append(pursuer_ang_vel_world)  # (3)
+        pursuer_ang_vel_body = quat_rotate_inverse(
+            pursuer_quat_wxyz, pursuer_ang_vel_world)
+        components.append(pursuer_ang_vel_body)  # (3)
 
     obs = torch.cat(components, dim=-1)
     if obs.shape[-1] != cfg.obs_dim:
